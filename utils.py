@@ -1,6 +1,7 @@
 import os
 import re
 import mimetypes
+
 from telethon.tl.types import (
     MessageMediaPhoto, MessageMediaDocument,
     DocumentAttributeVideo, DocumentAttributeAudio,
@@ -8,14 +9,21 @@ from telethon.tl.types import (
     User
 )
 import css
+
 from telethon.tl.functions.account import GetAuthorizationsRequest
+from telethon.tl.functions.users import GetFullUserRequest
 
 async def save_dialog(client, entity, output_dir="dialogs"):
     dialog_id = entity.id
-    media_dir = os.path.join(output_dir, str(dialog_id), "media")
+    dialog_dir = os.path.join(output_dir, str(dialog_id))
+    media_dir = os.path.join(dialog_dir, "media")
     os.makedirs(media_dir, exist_ok=True)
+    os.makedirs(dialog_dir, exist_ok=True)
+    if getattr(entity, 'photo', None):
+        avatar_path = os.path.join(dialog_dir, "avatar.jpg")
+        await client.download_profile_photo(entity, file=avatar_path)
     
-    html_filename = os.path.join(output_dir, str(dialog_id), f"dialog_{dialog_id}.html")
+    html_filename = os.path.join(dialog_dir, f"dialog_{dialog_id}.html")
     os.makedirs(os.path.dirname(html_filename), exist_ok=True)
     
     with open(html_filename, 'w', encoding='utf-8') as f:
@@ -171,17 +179,12 @@ async def download_file(client, message, base_dir, media_type):
     return path, safe_filename
 
 async def fetch_user_info(client):
-    """
-    Получает информацию о текущем пользователе:
-    - id, username, телефон, био, премиум, аватарка (скачивается в 'dialogs/avatar.jpg')
-      и список подключённых устройств (авторизаций)
-    """
     os.makedirs("dialogs", exist_ok=True)
     me = await client.get_me()
     try:
         result = await client(GetAuthorizationsRequest())
         auths = result.authorizations
-    except Exception as e:
+    except Exception:
         auths = []
     devices = []
     for auth in auths:
@@ -191,11 +194,17 @@ async def fetch_user_info(client):
             'app_version': auth.app_version,
             'ip': auth.ip
         })
+    full = await client(GetFullUserRequest(me))
+    bio = getattr(full, 'about', None)
+    if bio is None and hasattr(full, 'full_user'):
+        bio = getattr(full.full_user, 'about', '')
+    if bio is None:
+        bio = ''
     user_info = {
         'id': me.id,
         'username': me.username,
         'phone': me.phone,
-        'bio': getattr(me, 'about', ''),
+        'bio': bio,
         'is_premium': getattr(me, 'is_premium', False),
         'avatar': None,
         'devices': devices
@@ -206,13 +215,6 @@ async def fetch_user_info(client):
     return user_info
 
 async def fetch_dialogs(client):
-    """
-    Получает список диалогов и определяет для каждого тип:
-    - "Пользователь" или "Бот" (если это личный чат)
-    - "Канал" (для каналов формируется ссылка на https://t.me/<username>, если есть)
-    - "Чат" (если это группа)
-    - "Избранное" (если название соответствует Saved Messages/Избранное)
-    """
     dialogs = []
     async for dialog in client.iter_dialogs():
         if dialog.name in ['Saved Messages', 'Избранное']:
@@ -250,8 +252,8 @@ if __name__ == "__main__":
     import asyncio
     from telethon import TelegramClient
 
-    api_id = YOUR_API_ID  # нечего здесь не меняем
-    api_hash = 'YOUR_API_HASH'  # нечего здесь не меняем 
+    api_id = YOUR_API_ID
+    api_hash = 'YOUR_API_HASH'
     session_name = 'session'
     client = TelegramClient(session_name, api_id, api_hash)
     async def main_wrapper():
