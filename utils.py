@@ -214,6 +214,8 @@ async def fetch_user_info(client):
         user_info['avatar'] = await client.download_profile_photo(me, file=avatar_path)
     return user_info
 
+
+
 async def fetch_dialogs(client):
     dialogs = []
     async for dialog in client.iter_dialogs():
@@ -228,17 +230,30 @@ async def fetch_dialogs(client):
                 path = f"https://t.me/{username}"
             else:
                 path = "#"
+            
+            channels_dir = os.path.join("dialogs", "channels")
+            os.makedirs(channels_dir, exist_ok=True)
+            avatar_path = None
+            if getattr(dialog.entity, 'photo', None):
+                avatar_path = os.path.join(channels_dir, f"{dialog.id}.jpg")
+                try:
+                    await client.download_profile_photo(dialog.entity, file=avatar_path)
+                except Exception as e:
+                    print(f"Ошибка при загрузке аватарки для канала {dialog.id}: {e}")
+                    avatar_path = None
             dialogs.append({
                 'id': dialog.id,
                 'name': dialog.name,
                 'type': type_label,
-                'path': path
+                'path': path,
+                'avatar': avatar_path
             })
             continue
         elif dialog.is_group:
             type_label = 'Чат'
         else:
             type_label = 'Неизвестно'
+        
         path = os.path.join("dialogs", str(dialog.id), f"dialog_{dialog.id}.html")
         dialogs.append({
             'id': dialog.id,
