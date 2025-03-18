@@ -98,13 +98,17 @@ async def generate_index(user, dialogs, output_dir="dialogs"):
         f.write('<h1>Архив диалогов</h1>')
         for dialog in dialogs_sorted:
             relative_path = dialog['path'] if dialog['path'].startswith("http") else os.path.relpath(dialog['path'], start=output_dir)
-            avatar_file_path = os.path.join(output_dir, str(dialog['id']), "avatar.jpg")
-            if os.path.exists(avatar_file_path):
-                relative_avatar_path = os.path.relpath(avatar_file_path, start=output_dir)
+            if dialog.get("type") == "Канал" and dialog.get("avatar") and os.path.exists(dialog.get("avatar")):
+                relative_avatar_path = os.path.relpath(dialog.get("avatar"), start=output_dir)
                 icon_html = f'<img src="{relative_avatar_path}" alt="Avatar" class="dialog-avatar">'
             else:
-                initial_letter = dialog['name'][0].upper() if dialog['name'] else "?"
-                icon_html = initial_letter
+                avatar_file_path = os.path.join(output_dir, str(dialog['id']), "avatar.jpg")
+                if os.path.exists(avatar_file_path):
+                    relative_avatar_path = os.path.relpath(avatar_file_path, start=output_dir)
+                    icon_html = f'<img src="{relative_avatar_path}" alt="Avatar" class="dialog-avatar">'
+                else:
+                    initial_letter = dialog['name'][0].upper() if dialog['name'] else "?"
+                    icon_html = initial_letter
             f.write(f'''
             <div class="dialog">
                 <div class="dialog-icon">{icon_html}</div>
