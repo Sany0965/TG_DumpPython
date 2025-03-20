@@ -1,17 +1,19 @@
 import os
+import time
 import re
 import mimetypes
-
 from telethon.tl.types import (
     MessageMediaPhoto, MessageMediaDocument,
     DocumentAttributeVideo, DocumentAttributeAudio,
     DocumentAttributeSticker, MessageMediaGeo,
-    User
+    User, Channel, MessageMediaWebPage,         
+    MessageReplyHeader, ReplyInlineMarkup       
 )
-import css
-
 from telethon.tl.functions.account import GetAuthorizationsRequest
 from telethon.tl.functions.users import GetFullUserRequest
+from telethon.utils import get_extension        
+from channel import generate_channel_html       
+import css
 
 async def save_dialog(client, entity, output_dir="dialogs"):
     dialog_id = entity.id
@@ -146,6 +148,81 @@ async def process_media(client, message, media_dir):
         html += f'<div class="error">[Ошибка: {str(e)}]</div>'
     html += '</div>'
     return html
+    
+
+
+async def save_channel(client, entity, output_dir="dialogs/channels"):
+    try:
+        channel_dir = os.path.join(output_dir, str(entity.id))
+        media_dir = os.path.join(channel_dir, "media")
+        os.makedirs(channel_dir, exist_ok=True)
+        os.makedirs(media_dir, exist_ok=True)
+
+        total_messages = (await client.get_messages(entity, limit=0)).total
+        processed = 0
+        start_time = time.time()
+
+        def update_progress():
+            nonlocal processed
+            percent = (processed / total_messages) * 100
+            elapsed = time.time() - start_time
+            print(
+                f"\rОбработка: [{'#' * int(percent//2)}{' ' * (50 - int(percent//2))}] "
+                f"{percent:.1f}% | Сообщений: {processed}/{total_messages} | "
+                f"Время: {elapsed:.1f}с", end='', flush=True)
+
+        avatar_path = os.path.join(channel_dir, "avatar.jpg")
+        try:
+            await client.download_profile_photo(entity, file=avatar_path)
+        except Exception as e:
+            print(f"\nОшибка аватарки: {str(e)}")
+            avatar_path = None
+
+        try:
+            full = await client(GetFullChannelRequest(entity))
+            participants_count = full.full_chat.participants_count
+        except Exception as e:
+            print(f"\nОшибка получения полной информации о канале: {str(e)}")
+            participants_count = getattr(entity, 'participants_count', 0)
+
+        channel_info = {
+            'id': entity.id,
+            'title': entity.title,
+            'username': getattr(entity, 'username', None),
+            'participants_count': participants_count,
+            'description': getattr(entity, 'about', ''),
+            'avatar': avatar_path
+        }
+
+        posts = []
+        async for message in client.iter_messages(entity, limit=None):
+            posts.append(message)
+            processed += 1
+            if processed % 10 == 0 or processed == total_messages:
+                update_progress()
+
+        print("\nГенерация HTML...")
+        html_path = os.path.join(channel_dir, f"channel_{entity.id}.html")
+        await generate_channel_html(
+            channel_info=channel_info,
+            posts=posts,
+            output_path=html_path,
+            media_dir=media_dir,
+            progress_callback=lambda p: print(f"\rСохранение медиа: {p}%", end='')
+        )
+
+        print(f"\nКанал сохранен: {html_path}")
+        return {
+            'id': entity.id,
+            'name': channel_info['title'],
+            'type': 'Канал',
+            'path': html_path,
+            'avatar': avatar_path
+        }
+
+    except Exception as e:
+        print(f"\nКритическая ошибка: {str(e)}")
+        raise
 
 async def download_file(client, message, base_dir, media_type):
     filename = f'file_{message.id}'
