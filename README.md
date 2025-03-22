@@ -23,13 +23,13 @@
 
 ## Пример интерфейса 
 ### Главная страница
-[Главная страница](https://i.postimg.cc/jjzX0fX7/Picsart-25-03-22-09-47-45-539.jpg)
+![Главная страница](https://i.postimg.cc/jjzX0fX7/Picsart-25-03-22-09-47-45-539.jpg)
 
 ### Пример диалога
-[Пример диалога](https://i.postimg.cc/3JdFrV17/Picsart-25-03-22-09-48-08-327.jpg)
+![Пример диалога](https://s.iimg.su/s/22/E9PG6Fp9QVfiq8p7sqwspMerO8vsK8HSIxS3emo1.jpg)
 
 ### Пример дампа канала
-[Пример канала](https://i.postimg.cc/g2hy8h1T/Picsart-25-03-22-09-48-23-789.jpg)
+![Пример канала](https://i.postimg.cc/g2hy8h1T/Picsart-25-03-22-09-48-23-789.jpg)
 
 **PS: Это скриншоты v.5, сейчас выглядит по другому**
 
