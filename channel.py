@@ -1,5 +1,6 @@
 import os
 import time
+import re
 from datetime import datetime
 from telethon.tl.types import (
     MessageMediaPhoto, MessageMediaDocument,
@@ -18,30 +19,30 @@ CSS_STYLES = """
         --text-light: #FFFFFF;
         --animation-duration: 0.3s;
     }
-    * { 
-        box-sizing: border-box; 
-        margin: 0; 
-        padding: 0; 
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
     }
-    body { 
-        font-family: 'Roboto', sans-serif; 
-        background: var(--background); 
-        padding: 20px; 
-        color: var(--text-light); 
+    body {
+        font-family: 'Roboto', sans-serif;
+        background: var(--background);
+        padding: 20px;
+        color: var(--text-light);
     }
-    .container { 
-        max-width: 800px; 
-        margin: 0 auto; 
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
     }
     .header {
         text-align: center;
         margin-bottom: 20px;
     }
-    .avatar { 
-        width: 80px; 
-        height: 80px; 
-        border-radius: 50%; 
-        object-fit: cover; 
+    .avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
         border: 2px solid var(--my-message);
         margin-bottom: 10px;
     }
@@ -108,6 +109,24 @@ CSS_STYLES = """
         margin-bottom: 8px;
         line-height: 1.4;
     }
+    .post-text a {
+        color: #0096FF;
+        text-decoration: none;
+    }
+    .post-text a:hover {
+        text-decoration: underline;
+    }
+    .post-text .hashtag {
+        color: #0000FF;
+    }
+    blockquote {
+        border-left: 4px solid #0096FF;
+        padding-left: 10px;
+        margin: 10px 0;
+        font-style: italic;
+        color: var(--text-light);
+        background: rgba(0, 0, 0, 0.1);
+    }
     .media-container {
         margin: 10px 0;
         border-radius: 12px;
@@ -126,6 +145,7 @@ CSS_STYLES = """
         max-width: 100%;
         height: auto;
         border-radius: 12px;
+        margin: 5px;
     }
     .stats {
         font-size: 1em;
@@ -167,9 +187,18 @@ CSS_STYLES = """
 </style>
 """
 
+def format_post_text(text):
+    pattern_link = re.compile(r'([^]+)(https?://[^\s)]+)')
+    text = pattern_link.sub(r'<a href="\2">\1</a>', text)
+    text = re.sub(r'\*\*([^\*]+)\*\*', r'<strong>\1</strong>', text)
+    text = re.sub(r'(\B#[\w\d_]+)', r'<span class="hashtag">\1</span>', text)
+    text = re.sub(r'(?m)^> (.+)$', r'<blockquote>\1</blockquote>', text)
+    return text
+
 async def generate_channel_html(channel_info, posts, output_path, media_dir, progress_callback=None):
     total_posts = len(posts)
     start_time = time.time()
+    processed_grouped = set()
     async def update_progress(current):
         if progress_callback:
             percent = current / total_posts * 100
@@ -197,43 +226,68 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
         </header>
         <div class="messages">
 ''')
-        for idx, post in enumerate(reversed(posts)):
-            await update_progress(idx + 1)
-            post_date = post.date.strftime('%d %B %Y')
-            f.write(f'''
+        for post in reversed(posts):
+            await update_progress(1)
+            grouped_id = getattr(post, 'grouped_id', None)
+            if grouped_id:
+                if grouped_id in processed_grouped:
+                    continue
+                group = [p for p in posts if getattr(p, 'grouped_id', None) == grouped_id]
+                processed_grouped.add(grouped_id)
+                post_date = group[0].date.strftime('%d %B %Y')
+                f.write(f'''
             <div class="message their">
                 <div class="bubble">
                     <div class="meta">
                         <span class="sender">{channel_info['title']}</span>
                         <span class="date">{post_date}</span>
                     </div>
-            ''')
-            if post.pinned:
-                f.write('<div class="pinned" style="font-size:0.8em; margin-bottom:6px;">📌 Закреплено</div>')
-            if post.text:
-                text = post.text.replace("\n", "<br>")
-                f.write(f'<div class="post-text">{text}</div>')
-            if post.media and not isinstance(post.media, MessageMediaWebPage):
-                media_html = await process_post_media(post, media_dir)
+                ''')
+                text = next((p.text for p in group if p.text), '')
+                if text:
+                    formatted_text = format_post_text(text)
+                    formatted_text = formatted_text.replace("\n", "<br>")
+                    f.write(f'<div class="post-text">{formatted_text}</div>')
+                media_html = await process_grouped_media(group, media_dir)
                 f.write(f'<div class="media-container">{media_html}</div>')
-            f.write('<div class="stats">')
-            if post.views:
-                f.write(f'<span class="views"><i class="fas fa-eye"></i> {post.views}</span>')
-            if post.reactions:
-                f.write('<span class="reactions">')
-                for reaction in post.reactions.results:
-                    emoji = getattr(reaction.reaction, "emoticon", "❤️")
-                    f.write(f'<span>{emoji} {reaction.count}</span>')
-                f.write('</span>')
-            f.write('</div>')
-            if post.reply_markup:
-                f.write('<div class="buttons">')
-                for row in post.reply_markup.rows:
-                    for button in row.buttons:
-                        if hasattr(button, "url"):
-                            f.write(f'<a href="{button.url}" class="button">{button.text}</a>')
+                f.write('</div></div>')
+            else:
+                post_date = post.date.strftime('%d %B %Y')
+                f.write(f'''
+            <div class="message their">
+                <div class="bubble">
+                    <div class="meta">
+                        <span class="sender">{channel_info['title']}</span>
+                        <span class="date">{post_date}</span>
+                    </div>
+                ''')
+                if post.pinned:
+                    f.write('<div class="pinned" style="font-size:0.8em; margin-bottom:6px;">📌 Закреплено</div>')
+                if post.text:
+                    formatted_text = format_post_text(post.text)
+                    formatted_text = formatted_text.replace("\n", "<br>")
+                    f.write(f'<div class="post-text">{formatted_text}</div>')
+                if post.media and not isinstance(post.media, MessageMediaWebPage):
+                    media_html = await process_post_media(post, media_dir)
+                    f.write(f'<div class="media-container">{media_html}</div>')
+                f.write('<div class="stats">')
+                if post.views:
+                    f.write(f'<span class="views"><i class="fas fa-eye"></i> {post.views}</span>')
+                if post.reactions:
+                    f.write('<span class="reactions">')
+                    for reaction in post.reactions.results:
+                        emoji = getattr(reaction.reaction, "emoticon", "❤️")
+                        f.write(f'<span>{emoji} {reaction.count}</span>')
+                    f.write('</span>')
                 f.write('</div>')
-            f.write('</div></div>')
+                if post.reply_markup:
+                    f.write('<div class="buttons">')
+                    for row in post.reply_markup.rows:
+                        for button in row.buttons:
+                            if hasattr(button, "url"):
+                                f.write(f'<a href="{button.url}" class="button">{button.text}</a>')
+                    f.write('</div>')
+                f.write('</div></div>')
         f.write('''
         </div>
         <footer style="text-align: center; margin-top: 20px; font-size: 0.9em; opacity: 0.7;">
@@ -247,10 +301,45 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
         progress_callback("Готово! Архив сохранен")
     return output_path
 
+async def process_grouped_media(group, media_dir):
+    html = '<div class="media">'
+    for post in group:
+        if post.media and not isinstance(post.media, MessageMediaWebPage):
+            media = post.media
+            if isinstance(media, MessageMediaPhoto):
+                path, filename = await download_media(post, media_dir, 'photos')
+                rel_path = os.path.join('media', 'photos', filename)
+                html += f'<img src="{rel_path}" alt="Фото">'
+            elif isinstance(media, MessageMediaDocument):
+                doc = media.document
+                attrs = {type(a): a for a in doc.attributes}
+                if DocumentAttributeVideo in attrs:
+                    path, filename = await download_media(post, media_dir, 'videos')
+                    rel_path = os.path.join('media', 'videos', filename)
+                    html += f'<video controls><source src="{rel_path}"></video>'
+                elif DocumentAttributeAudio in attrs:
+                    path, filename = await download_media(post, media_dir, 'audio')
+                    rel_path = os.path.join('media', 'audio', filename)
+                    html += f'<audio controls><source src="{rel_path}"></audio>'
+                else:
+                    path, filename = await download_media(post, media_dir, 'files')
+                    rel_path = os.path.join('media', 'files', filename)
+                    html += f'📎 <a href="{rel_path}" download>{filename}</a>'
+            elif hasattr(media, 'geo'):
+                geo = media.geo
+                html += f'''
+                <div class="geo">
+                    📍 <a href="https://www.openstreetmap.org/?mlat={geo.lat}&mlon={geo.long}" target="_blank">
+                        {geo.lat:.4f}, {geo.long:.4f}
+                    </a>
+                </div>'''
+    html += '</div>'
+    return html
+
 async def process_post_media(post, media_dir):
-    media = post.media
     html = '<div class="media">'
     try:
+        media = post.media
         if isinstance(media, MessageMediaPhoto):
             path, filename = await download_media(post, media_dir, 'photos')
             rel_path = os.path.join('media', 'photos', filename)
@@ -283,13 +372,21 @@ async def process_post_media(post, media_dir):
     html += '</div>'
     return html
 
-async def download_media(post, base_dir, media_type):
-    filename = f'post_{post.id}'
-    ext = get_extension(post.media) or 'bin'
-    filename = f'{filename}.{ext}'
+async def download_media(media_obj, base_dir, media_type):
     target_dir = os.path.join(base_dir, media_type)
     os.makedirs(target_dir, exist_ok=True)
-    path = os.path.join(target_dir, filename)
+    if isinstance(media_obj, MessageMediaDocument):
+        doc = media_obj.document
+        filename = getattr(doc, 'file_name', None)
+        if filename:
+            target_filename = filename
+        else:
+            ext = get_extension(media_obj) or 'bin'
+            target_filename = f'post_{media_obj.id}.{ext}'
+    else:
+        ext = get_extension(media_obj) or 'bin'
+        target_filename = f'post_{media_obj.id}.{ext}'
+    path = os.path.join(target_dir, target_filename)
     if not os.path.exists(path):
-        await post.download_media(file=path)
-    return path, filename
+        await media_obj.download_media(file=path)
+    return path, target_filename
