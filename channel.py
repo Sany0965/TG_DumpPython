@@ -5,6 +5,7 @@ from datetime import datetime
 from telethon.tl.types import (
     MessageMediaPhoto, MessageMediaDocument,
     DocumentAttributeVideo, DocumentAttributeAudio,
+    DocumentAttributeFilename,
     MessageMediaGeo, MessageMediaWebPage
 )
 from telethon.utils import get_extension
@@ -371,22 +372,24 @@ async def process_post_media(post, media_dir):
         html += f'<div style="color: red">[Ошибка медиа: {str(e)}]</div>'
     html += '</div>'
     return html
+async def download_media(post, base_dir, media_type):
+    filename = f'post_{post.id}'
+    ext = get_extension(post.media) or 'bin'
 
-async def download_media(media_obj, base_dir, media_type):
+    if isinstance(post.media, MessageMediaDocument) and post.media.document:
+        doc = post.media.document
+        for attr in doc.attributes:
+            if isinstance(attr, DocumentAttributeFilename):
+                ext = os.path.splitext(attr.file_name)[1]  
+                filename = os.path.splitext(attr.file_name)[0]  
+                break
+
+    filename = f"{filename}{ext}" 
     target_dir = os.path.join(base_dir, media_type)
     os.makedirs(target_dir, exist_ok=True)
-    if isinstance(media_obj, MessageMediaDocument):
-        doc = media_obj.document
-        filename = getattr(doc, 'file_name', None)
-        if filename:
-            target_filename = filename
-        else:
-            ext = get_extension(media_obj) or 'bin'
-            target_filename = f'post_{media_obj.id}.{ext}'
-    else:
-        ext = get_extension(media_obj) or 'bin'
-        target_filename = f'post_{media_obj.id}.{ext}'
-    path = os.path.join(target_dir, target_filename)
+    path = os.path.join(target_dir, filename)
+
     if not os.path.exists(path):
-        await media_obj.download_media(file=path)
-    return path, target_filename
+        await post.download_media(file=path)
+
+    return path, filename
