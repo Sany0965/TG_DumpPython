@@ -14,6 +14,7 @@ from telethon.tl.functions.users import GetFullUserRequest
 from telethon.utils import get_extension        
 from channel import generate_channel_html       
 import css
+from telethon.tl.functions.channels import GetFullChannelRequest
 
 async def save_dialog(client, entity, output_dir="dialogs"):
     dialog_id = entity.id

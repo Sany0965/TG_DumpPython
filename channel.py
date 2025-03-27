@@ -177,6 +177,30 @@ CSS_STYLES = """
         font-size: 0.85em;
         margin-right: 6px;
     }
+    /* Стили для комментариев */
+    .comments {
+        margin-top: 10px;
+        border-top: 1px solid var(--text-light);
+        padding-top: 10px;
+    }
+    .comment {
+        margin-bottom: 8px;
+        padding: 8px;
+        background: var(--their-message);
+        border-radius: 10px;
+    }
+    .comment-sender {
+        font-weight: bold;
+        margin-right: 5px;
+    }
+    .comment-date {
+        font-size: 0.8em;
+        opacity: 0.7;
+    }
+    .comment-text {
+        margin-top: 4px;
+        line-height: 1.4;
+    }
     @media (max-width: 600px) {
         .bubble {
             max-width: 85%;
@@ -195,6 +219,22 @@ def format_post_text(text):
     text = re.sub(r'(\B#[\w\d_]+)', r'<span class="hashtag">\1</span>', text)
     text = re.sub(r'(?m)^> (.+)$', r'<blockquote>\1</blockquote>', text)
     return text
+
+def format_comments_html(comments):
+    html = '<div class="comments">'
+    for comment in comments:
+        comment_date = comment.date.strftime('%d %B %Y %H:%M') if hasattr(comment, 'date') else ''
+        sender = getattr(comment, 'sender', 'Аноним')  # можно заменить логику получения имени автора
+        formatted_text = format_post_text(comment.text)
+        formatted_text = formatted_text.replace("\n", "<br>")
+        html += f'''
+        <div class="comment">
+            <div><span class="comment-sender">{sender}</span> <span class="comment-date">{comment_date}</span></div>
+            <div class="comment-text">{formatted_text}</div>
+        </div>
+        '''
+    html += '</div>'
+    return html
 
 async def generate_channel_html(channel_info, posts, output_path, media_dir, progress_callback=None):
     total_posts = len(posts)
@@ -251,6 +291,10 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
                     f.write(f'<div class="post-text">{formatted_text}</div>')
                 media_html = await process_grouped_media(group, media_dir)
                 f.write(f'<div class="media-container">{media_html}</div>')
+                # Если комментарии доступны (предполагаем, что у первого сообщения группы есть comments)
+                if hasattr(group[0], 'comments') and group[0].comments:
+                    comments_html = format_comments_html(group[0].comments)
+                    f.write(comments_html)
                 f.write('</div></div>')
             else:
                 post_date = post.date.strftime('%d %B %Y')
@@ -262,7 +306,7 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
                         <span class="date">{post_date}</span>
                     </div>
                 ''')
-                if post.pinned:
+                if getattr(post, 'pinned', False):
                     f.write('<div class="pinned" style="font-size:0.8em; margin-bottom:6px;">📌 Закреплено</div>')
                 if post.text:
                     formatted_text = format_post_text(post.text)
@@ -272,22 +316,26 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
                     media_html = await process_post_media(post, media_dir)
                     f.write(f'<div class="media-container">{media_html}</div>')
                 f.write('<div class="stats">')
-                if post.views:
+                if getattr(post, 'views', None):
                     f.write(f'<span class="views"><i class="fas fa-eye"></i> {post.views}</span>')
-                if post.reactions:
+                if getattr(post, 'reactions', None):
                     f.write('<span class="reactions">')
                     for reaction in post.reactions.results:
                         emoji = getattr(reaction.reaction, "emoticon", "❤️")
                         f.write(f'<span>{emoji} {reaction.count}</span>')
                     f.write('</span>')
                 f.write('</div>')
-                if post.reply_markup:
+                if getattr(post, 'reply_markup', None):
                     f.write('<div class="buttons">')
                     for row in post.reply_markup.rows:
                         for button in row.buttons:
                             if hasattr(button, "url"):
                                 f.write(f'<a href="{button.url}" class="button">{button.text}</a>')
                     f.write('</div>')
+                # Добавляем комментарии, если они есть
+                if hasattr(post, 'comments') and post.comments:
+                    comments_html = format_comments_html(post.comments)
+                    f.write(comments_html)
                 f.write('</div></div>')
         f.write('''
         </div>
@@ -372,6 +420,7 @@ async def process_post_media(post, media_dir):
         html += f'<div style="color: red">[Ошибка медиа: {str(e)}]</div>'
     html += '</div>'
     return html
+
 async def download_media(post, base_dir, media_type):
     filename = f'post_{post.id}'
     ext = get_extension(post.media) or 'bin'

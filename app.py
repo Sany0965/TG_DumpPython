@@ -6,16 +6,16 @@ from utils import save_dialog, get_entity_name, fetch_user_info, fetch_dialogs, 
 from index import generate_index
 
 async def main():
-    api_id = а сюда api_id
-    api_hash = 'api_hash сюда'  
+    api_id = 
+    api_hash = ''  
     
     async with TelegramClient(
         'session_name',
         api_id,
         api_hash,
-        device_model='MonetExport',
+        device_model='DumpTGbyWorpli',
         system_version='13.0',
-        app_version='8.0'
+        app_version='9.1.0'
     ) as client:
         await client.start()
         
