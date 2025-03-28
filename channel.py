@@ -177,7 +177,6 @@ CSS_STYLES = """
         font-size: 0.85em;
         margin-right: 6px;
     }
-    /* Стили для комментариев */
     .comments {
         margin-top: 10px;
         border-top: 1px solid var(--text-light);
@@ -224,7 +223,7 @@ def format_comments_html(comments):
     html = '<div class="comments">'
     for comment in comments:
         comment_date = comment.date.strftime('%d %B %Y %H:%M') if hasattr(comment, 'date') else ''
-        sender = getattr(comment, 'sender', 'Аноним')  # можно заменить логику получения имени автора
+        sender = getattr(comment, 'sender', 'Аноним')
         formatted_text = format_post_text(comment.text)
         formatted_text = formatted_text.replace("\n", "<br>")
         html += f'''
@@ -264,6 +263,9 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
             <h1 class="channel-title">{channel_info['title']}</h1>
             <p class="channel-meta">@{channel_info.get('username', 'unknown')}</p>
             <p class="channel-meta">{subscribers} подписчиков</p>
+            <p class="channel-meta">ID: {channel_info['id']}</p>
+            <p class="channel-meta">Описание: {channel_info['description']}</p>
+            <p class="channel-meta">Ссылка: <a href="{channel_info.get('link', '#')}">{channel_info.get('link', 'Нет ссылки')}</a></p>
         </header>
         <div class="messages">
 ''')
@@ -291,7 +293,6 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
                     f.write(f'<div class="post-text">{formatted_text}</div>')
                 media_html = await process_grouped_media(group, media_dir)
                 f.write(f'<div class="media-container">{media_html}</div>')
-                # Если комментарии доступны (предполагаем, что у первого сообщения группы есть comments)
                 if hasattr(group[0], 'comments') and group[0].comments:
                     comments_html = format_comments_html(group[0].comments)
                     f.write(comments_html)
@@ -332,7 +333,6 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
                             if hasattr(button, "url"):
                                 f.write(f'<a href="{button.url}" class="button">{button.text}</a>')
                     f.write('</div>')
-                # Добавляем комментарии, если они есть
                 if hasattr(post, 'comments') and post.comments:
                     comments_html = format_comments_html(post.comments)
                     f.write(comments_html)

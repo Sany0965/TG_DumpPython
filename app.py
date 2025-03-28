@@ -1,31 +1,26 @@
 from telethon import TelegramClient
-from telethon.tl.types import User
+from telethon.tl.types import User, Channel, Chat
 import asyncio
-import os
-from utils import save_dialog, get_entity_name, fetch_user_info, fetch_dialogs, save_channel
+from utils import save_dialog, fetch_dialogs, save_channel, get_entity_name, fetch_user_info
 from index import generate_index
+from info import get_full_account_info
 
-async def main():
-    api_id = 
-    api_hash = ''  
-    
-    async with TelegramClient(
-        'session_name',
-        api_id,
-        api_hash,
-        device_model='DumpTGbyWorpli',
-        system_version='13.0',
-        app_version='9.1.0'
-    ) as client:
-        await client.start()
-        
+async def main_menu(client):
+    while True:
         print("\n1 - Дамп одного диалога")
         print("2 - Дамп всех личных диалогов")
         print("3 - Дамп канала")
+        print("4 - Дамп избранного (Saved Messages)")
+        print("5 - Полная информация об аккаунте")
+        print("0 - Выход")
         choice = input("Выберите действие: ")
-        
-        if choice == '1':
-            target = input("Введите username без @.")
+
+        if choice == '0':
+            print("\nЗавершение работы...")
+            break
+
+        elif choice == '1':
+            target = input("Введите username без @: ")
             try:
                 entity = await client.get_entity(target)
                 result = await save_dialog(client, entity)
@@ -62,8 +57,35 @@ async def main():
             except Exception as e:
                 print(f"\nОшибка: {str(e)}")
 
+        elif choice == '4':
+            try:
+                me = await client.get_me()
+                saved_messages = await client.get_entity("me")
+                result = await save_dialog(client, saved_messages)
+                print(f"\nДиалог 'Избранное' сохранён: {result['path']}")
+            except Exception as e:
+                print(f"\nОшибка: {str(e)}")
+
+        elif choice == '5':
+            await get_full_account_info(client)
+
         else:
             print("\nНекорректный выбор!")
+
+async def main():
+    api_id = 
+    api_hash = ''  
+    
+    async with TelegramClient(
+        'session_name',
+        api_id,
+        api_hash,
+        device_model='DumpTGbyWorpli',
+        system_version='10.0',
+        app_version='10.0'
+    ) as client:
+        await client.start()
+        await main_menu(client)
 
 if __name__ == '__main__':
     asyncio.run(main())
