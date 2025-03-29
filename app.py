@@ -41,7 +41,7 @@ async def main_menu(client):
             
             user = await fetch_user_info(client)
             all_dialogs = await fetch_dialogs(client)
-            await generate_index(user, all_dialogs)
+            await generate_index(client, user, all_dialogs)
             print("\nВсе личные диалоги сохранены! By @worpli")
 
         elif choice == '3':
@@ -81,8 +81,8 @@ async def main():
         api_id,
         api_hash,
         device_model='DumpTGbyWorpli',
-        system_version='10.0',
-        app_version='10.0'
+        system_version='10.1',
+        app_version='10.1'
     ) as client:
         await client.start()
         await main_menu(client)

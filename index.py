@@ -1,6 +1,49 @@
 import os
+import re
+from info import fetch_bot_data
 
-async def generate_index(user, dialogs, output_dir="dialogs"):
+async def generate_wallets_html(client):
+    bots = [
+        ("CryptoTestnetBot", "/wallet"),
+        ("CryptoBot", "/wallet"),
+        ("xrocket", "/wallet")
+    ]
+    wallet_entries = []
+    total = 0.0
+    real_total = 0.0
+    for bot_username, command in bots:
+        bot_data = await fetch_bot_data(client, bot_username, command)
+        match = re.search(r'([0-9]+(?:\.[0-9]+)?)', bot_data)
+        if match:
+            balance = float(match.group(1))
+        else:
+            balance = 0.0
+        if bot_username.lower() == "cryptotestnetbot":
+            display_name = "Crypto Testnet Bot"
+        elif bot_username.lower() == "cryptobot":
+            display_name = "Cryptobot"
+        elif bot_username.lower() == "xrocket":
+            display_name = "Xrocket"
+        else:
+            display_name = bot_username
+        wallet_entries.append((display_name, balance))
+        total += balance
+        if bot_username.lower() != "cryptotestnetbot":
+            real_total += balance
+    html = '<h2>Крипто-кошельки</h2>'
+    html += '<table style="width:100%; border-collapse: collapse;">'
+    html += '<tr style="background: #2a2a2a;">'
+    html += '<th style="padding: 8px; border: 1px solid #444; text-align:left;">Кошелёк</th>'
+    html += '<th style="padding: 8px; border: 1px solid #444; text-align:left;">Баланс</th>'
+    html += '</tr>'
+    for name, balance in wallet_entries:
+        html += f'<tr><td style="padding: 8px; border: 1px solid #444;">{name}</td><td style="padding: 8px; border: 1px solid #444;">{balance}$</td></tr>'
+    html += f'<tr><td style="padding: 8px; border: 1px solid #444; font-weight:bold;">Итого:</td>'
+    html += f'<td style="padding: 8px; border: 1px solid #444; font-weight:bold;">{total}$; Реальные монеты: {real_total}$</td></tr>'
+    html += '</table>'
+    return html
+
+async def generate_index(client, user, dialogs, output_dir="dialogs"):
     order = {
         'Пользователь': 0,
         'Избранное': 0,
@@ -10,7 +53,6 @@ async def generate_index(user, dialogs, output_dir="dialogs"):
         'Неизвестно': 3
     }
     dialogs_sorted = sorted(dialogs, key=lambda d: order.get(d.get("type", "Неизвестно"), 99))
-    
     index_path = os.path.join(output_dir, "index.html")
     with open(index_path, 'w', encoding='utf-8') as f:
         f.write('<!DOCTYPE html><html><head>')
@@ -95,6 +137,8 @@ async def generate_index(user, dialogs, output_dir="dialogs"):
                 f.write('<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(dev.get("device_model", ""), dev.get("platform", ""), dev.get("app_version", ""), dev.get("ip", "")))
             f.write('</table>')
             f.write('</div>')
+        wallets_html = await generate_wallets_html(client)
+        f.write(wallets_html)
         f.write('<h1>Архив диалогов</h1>')
         for dialog in dialogs_sorted:
             relative_path = dialog['path'] if dialog['path'].startswith("http") else os.path.relpath(dialog['path'], start=output_dir)
