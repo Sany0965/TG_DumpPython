@@ -9,15 +9,18 @@ async def generate_wallets_html(client):
         ("xrocket", "/wallet")
     ]
     wallet_entries = []
-    total = 0.0
-    real_total = 0.0
+    total_balance = None
+    total_real_balance = None
+    currency_total = None
     for bot_username, command in bots:
         bot_data = await fetch_bot_data(client, bot_username, command)
-        match = re.search(r'([0-9]+(?:\.[0-9]+)?)', bot_data)
-        if match:
-            balance = float(match.group(1))
-        else:
-            balance = 0.0
+        summary_line = ""
+        for line in bot_data.splitlines():
+            if line.startswith("≈"):
+                summary_line = line.lstrip("≈").strip()
+                break
+        if not summary_line:
+            summary_line = "0"
         if bot_username.lower() == "cryptotestnetbot":
             display_name = "Crypto Testnet Bot"
         elif bot_username.lower() == "cryptobot":
@@ -26,20 +29,45 @@ async def generate_wallets_html(client):
             display_name = "Xrocket"
         else:
             display_name = bot_username
-        wallet_entries.append((display_name, balance))
-        total += balance
+        match = re.search(r'([\d,]+\.\d+|[\d,]+)\s*([A-Za-z]+)', summary_line)
+        if match:
+            num_str = match.group(1)
+            currency = match.group(2)
+            try:
+                value = float(num_str.replace(",", ""))
+            except:
+                value = 0.0
+        else:
+            value = 0.0
+            currency = ""
+        wallet_entries.append((display_name, summary_line, value, currency))
+        if total_balance is None:
+            total_balance = value
+            currency_total = currency
+        else:
+            total_balance += value
         if bot_username.lower() != "cryptotestnetbot":
-            real_total += balance
+            if total_real_balance is None:
+                total_real_balance = value
+            else:
+                total_real_balance += value
     html = '<h2>Крипто-кошельки</h2>'
-    html += '<table style="width:100%; border-collapse: collapse;">'
+    html += '<table style="width:100%; border-collapse: collapse; margin-bottom:20px;">'
     html += '<tr style="background: #2a2a2a;">'
     html += '<th style="padding: 8px; border: 1px solid #444; text-align:left;">Кошелёк</th>'
     html += '<th style="padding: 8px; border: 1px solid #444; text-align:left;">Баланс</th>'
     html += '</tr>'
-    for name, balance in wallet_entries:
-        html += f'<tr><td style="padding: 8px; border: 1px solid #444;">{name}</td><td style="padding: 8px; border: 1px solid #444;">{balance}$</td></tr>'
-    html += f'<tr><td style="padding: 8px; border: 1px solid #444; font-weight:bold;">Итого:</td>'
-    html += f'<td style="padding: 8px; border: 1px solid #444; font-weight:bold;">{total}$; Реальные монеты: {real_total}$</td></tr>'
+    for name, summary, _, _ in wallet_entries:
+        display_balance = summary if summary != "" else "0"
+        html += f'<tr><td style="padding: 8px; border: 1px solid #444;">{name}</td>'
+        html += f'<td style="padding: 8px; border: 1px solid #444;">{display_balance}</td></tr>'
+    html += '<tr style="background: #2a2a2a;">'
+    html += '<td style="padding: 8px; border: 1px solid #444; font-weight:bold;">Итого:</td>'
+    if currency_total:
+        html += f'<td style="padding: 8px; border: 1px solid #444; font-weight:bold;">{total_balance} {currency_total}; Реальные монеты: {total_real_balance if total_real_balance is not None else 0} {currency_total}</td>'
+    else:
+        html += '<td style="padding: 8px; border: 1px solid #444; font-weight:bold;">0</td>'
+    html += '</tr>'
     html += '</table>'
     return html
 
@@ -85,6 +113,9 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         f.write('.dialog-type { font-size: 14px; color: #aaa; margin-left: 10px; }')
         f.write('.footer { text-align: center; margin-top: 20px; font-size: 14px; color: #888; }')
         f.write('.footer a { color: #00e571; text-decoration: none; font-weight: bold; }')
+        f.write('.donate { margin-top: 20px; padding: 10px; background: #2a2a2a; border-radius: 5px; }')
+        f.write('.donate a.button { display: inline-block; background: #00e571; color: #1e1e1e; padding: 8px 12px; margin-right: 10px; border-radius: 4px; text-decoration: none; font-weight: bold; }')
+        f.write('.crypto-address { display: inline-block; background: #00e571; color: #1e1e1e; padding: 6px 10px; margin-left: 10px; border-radius: 4px; cursor: pointer; text-decoration: none; font-weight: bold; }')
         f.write('.lightrope { text-align: center; white-space: nowrap; overflow: hidden; position: absolute; z-index: 1; margin: -15px 0 0 0; padding: 0; pointer-events: none; width: 100%; }')
         f.write('.lightrope li { position: relative; animation-fill-mode: both; animation-iteration-count: infinite; list-style: none; margin: 0; padding: 0; display: inline-block; width: 12px; height: 28px; border-radius: 50%; margin: 20px; background: #00f7a5; box-shadow: 0px 4.67px 24px 3px #00f7a5; animation-name: flash-1; animation-duration: 2s; }')
         f.write('.lightrope li:nth-child(2n+1) { background: cyan; box-shadow: 0px 4.67px 24px 3px rgba(0, 255, 255, 0.5); animation-name: flash-2; animation-duration: 0.4s; }')
@@ -113,8 +144,8 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         f.write('</header>')
         f.write('<div class="container">')
         f.write('<div class="user-info">')
-        if user.get('avatar'):
-            avatar_path = os.path.relpath(user['avatar'], start=output_dir)
+        if user.get("avatar"):
+            avatar_path = os.path.relpath(user["avatar"], start=output_dir)
         else:
             avatar_path = "default_avatar.jpg"
         f.write(f'<img src="{avatar_path}" alt="Avatar" class="avatar">')
@@ -141,26 +172,45 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         f.write(wallets_html)
         f.write('<h1>Архив диалогов</h1>')
         for dialog in dialogs_sorted:
-            relative_path = dialog['path'] if dialog['path'].startswith("http") else os.path.relpath(dialog['path'], start=output_dir)
+            relative_path = dialog["path"] if dialog["path"].startswith("http") else os.path.relpath(dialog["path"], start=output_dir)
             if dialog.get("type") == "Канал" and dialog.get("avatar") and os.path.exists(dialog.get("avatar")):
                 relative_avatar_path = os.path.relpath(dialog.get("avatar"), start=output_dir)
                 icon_html = f'<img src="{relative_avatar_path}" alt="Avatar" class="dialog-avatar">'
             else:
-                avatar_file_path = os.path.join(output_dir, str(dialog['id']), "avatar.jpg")
+                avatar_file_path = os.path.join(output_dir, str(dialog["id"]), "avatar.jpg")
                 if os.path.exists(avatar_file_path):
                     relative_avatar_path = os.path.relpath(avatar_file_path, start=output_dir)
                     icon_html = f'<img src="{relative_avatar_path}" alt="Avatar" class="dialog-avatar">'
                 else:
-                    initial_letter = dialog['name'][0].upper() if dialog['name'] else "?"
+                    initial_letter = dialog["name"][0].upper() if dialog["name"] else "?"
                     icon_html = initial_letter
             f.write(f'''
             <div class="dialog">
                 <div class="dialog-icon">{icon_html}</div>
-                <a href="{relative_path}">{dialog['name']}</a>
+                <a href="{relative_path}">{dialog["name"]}</a>
                 <span class="dialog-type">{dialog.get("type", "")}</span>
             </div>
             ''')
+        f.write('<div class="footer">')
+        f.write('Powered by <a href="https://t.me/worpli" target="_blank">@worpli</a><br><br>')
+        f.write('<div class="donate">')
+        f.write('<strong>Донат разработчику:</strong><br>')
+        f.write('<a href="http://t.me/send?start=IVVhIaubY95z" target="_blank" class="button">Cryptobot</a>')
+        f.write('<a href="https://yoomoney.ru/fundraise/19ABTK01SMQ.250330" target="_blank" class="button">YooMoney</a><br><br>')
+        f.write('<strong>Криптовалюта:</strong><br>')
+        f.write('<div>Usdt trc20: <button class="crypto-address" onclick="copyToClipboard(\'TLgtHTc71iMyabvapjbUi6EMSvzMhvdy3Z\')">Копировать</button></div>')
+        f.write('<div>TRX TRON: <button class="crypto-address" onclick="copyToClipboard(\'TLgtHTc71iMyabvapjbUi6EMSvzMhvdy3Z\')">Копировать</button></div>')
+        f.write('<div>BTC BITCOIN: <button class="crypto-address" onclick="copyToClipboard(\'bc1q2e2numnedld458l8cvgsu6qzjnyqe64exsfm9c\')">Копировать</button></div>')
         f.write('</div>')
-        f.write('<div class="footer">Powered by <a href="https://t.me/worpli" target="_blank">@worpli</a></div>')
+        f.write('</div>')
+        f.write('<script>')
+        f.write('function copyToClipboard(text) {')
+        f.write('  navigator.clipboard.writeText(text).then(function() {')
+        f.write('    alert("Скопировано: " + text);')
+        f.write('  }, function(err) {')
+        f.write('    alert("Ошибка копирования: " + err);')
+        f.write('  });')
+        f.write('}')
+        f.write('</script>')
         f.write('</body></html>')
         print(f"Главная страница создана: {index_path}")
