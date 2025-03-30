@@ -208,6 +208,34 @@ CSS_STYLES = """
             padding: 0 10px;
         }
     }
+    /* Стили для кнопок доната и криптовалюты */
+    .donate {
+        margin-top: 20px;
+        padding: 15px;
+        background: #2a2a2a;
+        border-radius: 5px;
+        text-align: center;
+    }
+    .donate a.button, .crypto-address {
+        display: inline-block;
+        background: linear-gradient(45deg, #00e571, #00b359);
+        color: #151e17;
+        padding: 10px 20px;
+        margin: 10px 5px;
+        border-radius: 25px;
+        text-decoration: none;
+        font-weight: bold;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .donate a.button:hover, .crypto-address:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 10px rgba(0,0,0,0.5);
+    }
+    .crypto-address {
+        cursor: pointer;
+        border: none;
+    }
 </style>
 """
 
@@ -339,10 +367,29 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
                 f.write('</div></div>')
         f.write('''
         </div>
+        <!-- Блок с кнопками доната и криптовалюты -->
+        <div class="donate">
+            <strong>Донат разработчику:</strong><br>
+            <a href="http://t.me/send?start=IVVhIaubY95z" target="_blank" class="button">Cryptobot</a>
+            <a href="https://yoomoney.ru/fundraise/19ABTK01SMQ.250330" target="_blank" class="button">YooMoney</a><br><br>
+            <strong>Криптовалюта:</strong><br>
+            <div>Usdt trc20: <button class="crypto-address" onclick="copyToClipboard('TLgtHTc71iMyabvapjbUi6EMSvzMhvdy3Z')">Копировать</button></div>
+            <div>TRX TRON: <button class="crypto-address" onclick="copyToClipboard('TLgtHTc71iMyabvapjbUi6EMSvzMhvdy3Z')">Копировать</button></div>
+            <div>BTC BITCOIN: <button class="crypto-address" onclick="copyToClipboard('bc1q2e2numnedld458l8cvgsu6qzjnyqe64exsfm9c')">Копировать</button></div>
+        </div>
         <footer style="text-align: center; margin-top: 20px; font-size: 0.9em; opacity: 0.7;">
             Powered by <a href="https://t.me/worpli" target="_blank" style="color: var(--my-message); text-decoration: none;">worpli</a>
         </footer>
     </div>
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert("Скопировано: " + text);
+            }, function(err) {
+                alert("Ошибка копирования: " + err);
+            });
+        }
+    </script>
 </body>
 </html>
 ''')

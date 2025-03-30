@@ -1,26 +1,31 @@
 from telethon import TelegramClient
 from telethon.tl.types import User, Channel, Chat
 import asyncio
-from utils import save_dialog, fetch_dialogs, save_channel, get_entity_name, fetch_user_info
+from utils import save_dialog, save_channel, get_entity_name, fetch_dialogs, fetch_user_info
 from index import generate_index
 from info import get_full_account_info
 
 async def main_menu(client):
     while True:
-        print("\n1 - Дамп одного диалога")
+       
+        print("\n********************************")
+        print("*DumpTGbyWorpli_V.10.3*")
+        print("********************************")
+        print("\nВыберите действие:\n")
+        print("1 - Дамп одного диалога")
         print("2 - Дамп всех личных диалогов")
         print("3 - Дамп канала")
         print("4 - Дамп избранного (Saved Messages)")
         print("5 - Полная информация об аккаунте")
         print("0 - Выход")
-        choice = input("Выберите действие: ")
+        choice = input("\nВаш выбор: ")
 
         if choice == '0':
             print("\nЗавершение работы...")
             break
 
         elif choice == '1':
-            target = input("Введите username без @: ")
+            target = input("\nВведите username без @: ")
             try:
                 entity = await client.get_entity(target)
                 result = await save_dialog(client, entity)
@@ -81,8 +86,8 @@ async def main():
         api_id,
         api_hash,
         device_model='DumpTGbyWorpli',
-        system_version='10.1',
-        app_version='10.1'
+        system_version='10.3',
+        app_version='10.3'
     ) as client:
         await client.start()
         await main_menu(client)

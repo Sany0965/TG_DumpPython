@@ -113,9 +113,12 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         f.write('.dialog-type { font-size: 14px; color: #aaa; margin-left: 10px; }')
         f.write('.footer { text-align: center; margin-top: 20px; font-size: 14px; color: #888; }')
         f.write('.footer a { color: #00e571; text-decoration: none; font-weight: bold; }')
-        f.write('.donate { margin-top: 20px; padding: 10px; background: #2a2a2a; border-radius: 5px; }')
-        f.write('.donate a.button { display: inline-block; background: #00e571; color: #1e1e1e; padding: 8px 12px; margin-right: 10px; border-radius: 4px; text-decoration: none; font-weight: bold; }')
-        f.write('.crypto-address { display: inline-block; background: #00e571; color: #1e1e1e; padding: 6px 10px; margin-left: 10px; border-radius: 4px; cursor: pointer; text-decoration: none; font-weight: bold; }')
+        # Новые стили для кнопок доната и криптовалюты
+        f.write('.donate { margin-top: 20px; padding: 15px; background: #2a2a2a; border-radius: 5px; text-align: center; }')
+        f.write('.donate a.button, .crypto-address { display: inline-block; background: linear-gradient(45deg, #00e571, #00b359); color: #1e1e1e; padding: 10px 20px; margin: 10px 5px; border-radius: 25px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s, box-shadow 0.2s; }')
+        f.write('.donate a.button:hover, .crypto-address:hover { transform: translateY(-3px); box-shadow: 0 6px 10px rgba(0,0,0,0.5); }')
+        f.write('.crypto-address { cursor: pointer; }')
+        # Стили для светящегося эффекта в header
         f.write('.lightrope { text-align: center; white-space: nowrap; overflow: hidden; position: absolute; z-index: 1; margin: -15px 0 0 0; padding: 0; pointer-events: none; width: 100%; }')
         f.write('.lightrope li { position: relative; animation-fill-mode: both; animation-iteration-count: infinite; list-style: none; margin: 0; padding: 0; display: inline-block; width: 12px; height: 28px; border-radius: 50%; margin: 20px; background: #00f7a5; box-shadow: 0px 4.67px 24px 3px #00f7a5; animation-name: flash-1; animation-duration: 2s; }')
         f.write('.lightrope li:nth-child(2n+1) { background: cyan; box-shadow: 0px 4.67px 24px 3px rgba(0, 255, 255, 0.5); animation-name: flash-2; animation-duration: 0.4s; }')
