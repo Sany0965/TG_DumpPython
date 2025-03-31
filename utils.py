@@ -15,6 +15,18 @@ from telethon.utils import get_extension
 from channel import generate_channel_html       
 import css
 from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon import functions, types
+
+async def get_stars_balance(client):
+    try:
+        result = await client(functions.payments.GetStarsStatusRequest(
+            peer=types.InputPeerSelf()
+        ))
+        
+        return result.balance
+    except Exception as e:
+        print("Ошибка при получении баланса Stars:", e)
+        return 0
 
 async def save_dialog(client, entity, output_dir="dialogs"):
     dialog_id = entity.id
@@ -81,6 +93,39 @@ async def save_dialog(client, entity, output_dir="dialogs"):
         'name': get_entity_name(entity),
         'path': html_filename
     }
+
+async def check_spam_block(client):
+    
+    try:
+        spam_bot = await client.get_entity('SpamBot')
+        await client.send_message(spam_bot, '/start')
+        
+        
+        start_time = time.time()
+        response_text = ""
+        
+        while time.time() - start_time < 10:
+            async for message in client.iter_messages(spam_bot, limit=1):
+                if not message.out:
+                    response_text = message.text
+                    break
+            if response_text:
+                break
+            await asyncio.sleep(1)
+        
+        
+        safe_phrases = [
+            "Ваш аккаунт свободен от каких-либо ограничений",
+            "Good news, no limits are currently applied to your account"
+        ]
+        if any(phrase in response_text for phrase in safe_phrases):
+            return "Нет"
+        return "Да"
+        
+    except Exception as e:
+        print(f"Ошибка проверки спам-блока: {str(e)}")
+        return "Неизвестно"
+
 
 async def get_forward_origin(client, fwd_from):
     try:
@@ -296,19 +341,20 @@ async def fetch_user_info(client):
 
 async def fetch_dialogs(client):
     dialogs = []
+    all_dialogs = []
     async for dialog in client.iter_dialogs():
-        if dialog.name in ['Saved Messages', 'Избранное']:
-            type_label = 'Избранное'
-        elif dialog.is_user:
-            type_label = 'Бот' if getattr(dialog.entity, 'bot', False) else 'Пользователь'
-        elif dialog.is_channel:
+        all_dialogs.append(dialog)
+    total_channels = sum(1 for dialog in all_dialogs if dialog.is_channel)
+    channel_count = 0
+    for dialog in all_dialogs:
+        if dialog.is_channel:
+            channel_count += 1
             type_label = 'Канал'
             username = getattr(dialog.entity, 'username', None)
             if username:
                 path = f"https://t.me/{username}"
             else:
                 path = "#"
-            
             channels_dir = os.path.join("dialogs", "channels")
             os.makedirs(channels_dir, exist_ok=True)
             avatar_path = None
@@ -316,6 +362,7 @@ async def fetch_dialogs(client):
                 avatar_path = os.path.join(channels_dir, f"{dialog.id}.jpg")
                 try:
                     await client.download_profile_photo(dialog.entity, file=avatar_path)
+                    print(f"Скачивание аватарок канала {channel_count}/{total_channels}")
                 except Exception as e:
                     print(f"Ошибка при загрузке аватарки для канала {dialog.id}: {e}")
                     avatar_path = None
@@ -327,11 +374,12 @@ async def fetch_dialogs(client):
                 'avatar': avatar_path
             })
             continue
+        elif dialog.is_user:
+            type_label = 'Бот' if getattr(dialog.entity, 'bot', False) else 'Пользователь'
         elif dialog.is_group:
             type_label = 'Чат'
         else:
             type_label = 'Неизвестно'
-        
         path = os.path.join("dialogs", str(dialog.id), f"dialog_{dialog.id}.html")
         dialogs.append({
             'id': dialog.id,

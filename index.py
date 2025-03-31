@@ -1,6 +1,9 @@
 import os
 import re
-from info import fetch_bot_data
+import asyncio
+import time
+from info import fetch_bot_data, get_entity_name  
+from utils import check_spam_block, get_stars_balance
 
 async def generate_wallets_html(client):
     bots = [
@@ -71,6 +74,32 @@ async def generate_wallets_html(client):
     html += '</table>'
     return html
 
+async def generate_contacts_html(client):
+    contacts = []
+    async for dialog in client.iter_dialogs():
+        entity = dialog.entity
+        if hasattr(entity, "contact") and entity.contact and not getattr(entity, "bot", False):
+            contacts.append(entity)
+    if not contacts:
+        return "<p>Контакты не найдены</p>"
+    
+    html = '<h2>Контакты</h2>'
+    html += '<table style="width:100%; border-collapse: collapse; margin-bottom:20px;">'
+    html += '<tr style="background: #2a2a2a;">'
+    html += '<th style="padding: 8px; border: 1px solid #444; text-align:left;">Имя</th>'
+    html += '<th style="padding: 8px; border: 1px solid #444; text-align:left;">Username</th>'
+    html += '<th style="padding: 8px; border: 1px solid #444; text-align:left;">Телефон</th>'
+    html += '</tr>'
+    for contact in contacts:
+        name = get_entity_name(contact)
+        username = f"@{contact.username}" if contact.username else "-"
+        phone = contact.phone if getattr(contact, "phone", None) else "скрыт"
+        html += f'<tr><td style="padding: 8px; border: 1px solid #444;">{name}</td>'
+        html += f'<td style="padding: 8px; border: 1px solid #444;">{username}</td>'
+        html += f'<td style="padding: 8px; border: 1px solid #444;">{phone}</td></tr>'
+    html += '</table>'
+    return html
+
 async def generate_index(client, user, dialogs, output_dir="dialogs"):
     order = {
         'Пользователь': 0,
@@ -81,6 +110,14 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         'Неизвестно': 3
     }
     dialogs_sorted = sorted(dialogs, key=lambda d: order.get(d.get("type", "Неизвестно"), 99))
+    
+    spam_status = await check_spam_block(client)
+    stars_balance = await get_stars_balance(client)
+    try:
+        stars_display = stars_balance.amount + stars_balance.nanos / 1e9
+    except Exception:
+        stars_display = stars_balance
+
     index_path = os.path.join(output_dir, "index.html")
     with open(index_path, 'w', encoding='utf-8') as f:
         f.write('<!DOCTYPE html><html><head>')
@@ -113,12 +150,10 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         f.write('.dialog-type { font-size: 14px; color: #aaa; margin-left: 10px; }')
         f.write('.footer { text-align: center; margin-top: 20px; font-size: 14px; color: #888; }')
         f.write('.footer a { color: #00e571; text-decoration: none; font-weight: bold; }')
-        # Новые стили для кнопок доната и криптовалюты
         f.write('.donate { margin-top: 20px; padding: 15px; background: #2a2a2a; border-radius: 5px; text-align: center; }')
         f.write('.donate a.button, .crypto-address { display: inline-block; background: linear-gradient(45deg, #00e571, #00b359); color: #1e1e1e; padding: 10px 20px; margin: 10px 5px; border-radius: 25px; text-decoration: none; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s, box-shadow 0.2s; }')
         f.write('.donate a.button:hover, .crypto-address:hover { transform: translateY(-3px); box-shadow: 0 6px 10px rgba(0,0,0,0.5); }')
         f.write('.crypto-address { cursor: pointer; }')
-        # Стили для светящегося эффекта в header
         f.write('.lightrope { text-align: center; white-space: nowrap; overflow: hidden; position: absolute; z-index: 1; margin: -15px 0 0 0; padding: 0; pointer-events: none; width: 100%; }')
         f.write('.lightrope li { position: relative; animation-fill-mode: both; animation-iteration-count: infinite; list-style: none; margin: 0; padding: 0; display: inline-block; width: 12px; height: 28px; border-radius: 50%; margin: 20px; background: #00f7a5; box-shadow: 0px 4.67px 24px 3px #00f7a5; animation-name: flash-1; animation-duration: 2s; }')
         f.write('.lightrope li:nth-child(2n+1) { background: cyan; box-shadow: 0px 4.67px 24px 3px rgba(0, 255, 255, 0.5); animation-name: flash-2; animation-duration: 0.4s; }')
@@ -160,6 +195,8 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         f.write('<div class="user-field"><span class="label"><i class="fas fa-info-circle"></i> Био:</span> <span class="value">{}</span></div>'.format(user.get("bio", "—")))
         premium_text = "Да" if user.get("is_premium") else "Нет"
         f.write('<div class="user-field"><span class="label"><i class="fas fa-star"></i> Премиум:</span> <span class="value">{}</span></div>'.format(premium_text))
+        f.write('<div class="user-field"><span class="label"><i class="fas fa-ban"></i> Спам-блок:</span> <span class="value">{}</span></div>'.format(spam_status))
+        f.write('<div class="user-field"><span class="label"><i class="fas fa-star"></i> Telegram Stars:</span> <span class="value">{}</span></div>'.format(stars_display))
         f.write('</div>')
         f.write('</div>')
         if user.get("devices"):
@@ -173,6 +210,8 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
             f.write('</div>')
         wallets_html = await generate_wallets_html(client)
         f.write(wallets_html)
+        contacts_html = await generate_contacts_html(client)
+        f.write(contacts_html)
         f.write('<h1>Архив диалогов</h1>')
         for dialog in dialogs_sorted:
             relative_path = dialog["path"] if dialog["path"].startswith("http") else os.path.relpath(dialog["path"], start=output_dir)

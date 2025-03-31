@@ -9,7 +9,7 @@ async def main_menu(client):
     while True:
        
         print("\n********************************")
-        print("*DumpTGbyWorpli_V.10.3*")
+        print("*DumpTGbyWorpli_V.11.0*")
         print("********************************")
         print("\nВыберите действие:\n")
         print("1 - Дамп одного диалога")
@@ -86,8 +86,8 @@ async def main():
         api_id,
         api_hash,
         device_model='DumpTGbyWorpli',
-        system_version='10.3',
-        app_version='10.3'
+        system_version='11.0',
+        app_version='11.0'
     ) as client:
         await client.start()
         await main_menu(client)
