@@ -16,6 +16,77 @@ from channel import generate_channel_html
 import css
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon import functions, types
+from telethon.tl.types import MessageMediaContact
+
+async def process_media(client, message, media_dir):
+    media = message.media
+    html = '<div class="media">'
+    try:
+        if isinstance(media, MessageMediaPhoto):
+            path, filename = await download_file(client, message, media_dir, 'photos')
+            rel_path = os.path.join("media", 'photos', filename)
+            html += f'<img src="{rel_path}" alt="{filename}">'
+        
+        elif isinstance(media, MessageMediaDocument):
+            doc = media.document
+            attrs = {type(a): a for a in doc.attributes}
+            mime_type = doc.mime_type or ''
+            if DocumentAttributeVideo in attrs:
+                path, filename = await download_file(client, message, media_dir, 'videos')
+                rel_path = os.path.join("media", 'videos', filename)
+                html += f'''
+                <video controls>
+                    <source src="{rel_path}" type="{mime_type}">
+                    Ваш браузер не поддерживает видео
+                </video>'''
+            elif DocumentAttributeAudio in attrs:
+                path, filename = await download_file(client, message, media_dir, 'audio')
+                rel_path = os.path.join("media", 'audio', filename)
+                html += f'''
+                <audio controls>
+                    <source src="{rel_path}" type="{mime_type}">
+                    Ваш браузер не поддерживает аудио
+                </audio>'''
+            elif DocumentAttributeSticker in attrs:
+                path, filename = await download_file(client, message, media_dir, 'stickers')
+                rel_path = os.path.join("media", 'stickers', filename)
+                html += f'<img src="{rel_path}" class="sticker" alt="Стикер">'
+            else:
+                path, filename = await download_file(client, message, media_dir, 'files')
+                rel_path = os.path.join("media", 'files', filename)
+                html += f'''
+                <div class="file-card">
+                    📎 <a href="{rel_path}" download="{filename}">{filename}</a>
+                </div>'''
+        
+        elif isinstance(media, MessageMediaGeo):
+            geo = media.geo
+            html += f'''
+            <div class="geo">
+                📍 <a href="https://www.openstreetmap.org/?mlat={geo.lat}&mlon={geo.long}" target="_blank">
+                   {geo.lat:.4f}, {geo.long:.4f}
+                </a>
+            </div>'''
+        
+        elif isinstance(media, MessageMediaContact):
+            contact = media
+            first_name = contact.first_name or ""
+            last_name = contact.last_name or ""
+            phone_number = contact.phone_number or "Не указан"
+            user_id = f"@{contact.user_id}" if hasattr(contact, "user_id") and contact.user_id else "Нет username"
+            full_name = f"{first_name} {last_name}".strip()
+            contact_display = f'''
+            <div class="contact-card">
+                <strong>👤 Контакт:</strong> {full_name if full_name else "Неизвестный"}<br>
+                <strong>📞 Телефон:</strong> {phone_number}<br>
+                <strong>🔗 Telegram:</strong> {user_id}
+            </div>'''
+            html += contact_display
+
+    except Exception as e:
+        html += f'<div class="error">[Ошибка: {str(e)}]</div>'
+    html += '</div>'
+    return html
 
 async def get_stars_balance(client):
     try:
@@ -34,6 +105,7 @@ async def save_dialog(client, entity, output_dir="dialogs"):
     media_dir = os.path.join(dialog_dir, "media")
     os.makedirs(media_dir, exist_ok=True)
     os.makedirs(dialog_dir, exist_ok=True)
+    
     if getattr(entity, 'photo', None):
         avatar_path = os.path.join(dialog_dir, "avatar.jpg")
         await client.download_profile_photo(entity, file=avatar_path)
@@ -76,14 +148,51 @@ async def save_dialog(client, entity, output_dir="dialogs"):
                         <span class="sender">{sender_name}</span>
                         <span class="date">{message.date.strftime('%d.%m.%Y %H:%M')}</span>
                     </div>'''
+            
             if message.text:
                 text = re.sub(r'\n', '<br>', message.text)
                 message_html += f'<div class="text">{text}</div>'
+            
             if message.media:
                 media_html = await process_media(client, message, media_dir)
                 message_html += media_html
+            
+            if hasattr(message, "reply_markup") and message.reply_markup:
+                try:
+                    inline_buttons_html = '<div class="inline-buttons">'
+                    for row in message.reply_markup.rows:
+                        inline_buttons_html += '<div class="inline-buttons-row">'
+                        for button in row.buttons:
+                            if hasattr(button, "url") and button.url:
+                                inline_buttons_html += (
+                                    f'<a class="inline-button" href="{button.url}" target="_blank">'
+                                    f'{button.text}</a>'
+                                )
+                            else:
+                                inline_buttons_html += f'<span class="inline-button">{button.text}</span>'
+                        inline_buttons_html += '</div>'
+                    inline_buttons_html += '</div>'
+                    message_html += inline_buttons_html
+                except Exception as e:
+                    message_html += f'<div class="error">[Ошибка обработки инлайн-кнопок: {str(e)}]</div>'
+            
+            if hasattr(message, "reactions") and message.reactions:
+                try:
+                    reaction_html = '<div class="reactions">'
+                    if hasattr(message.reactions, "results") and message.reactions.results:
+                        for reaction in message.reactions.results:
+                            reaction_str = getattr(reaction.reaction, 'emoticon', None) \
+                                if hasattr(reaction.reaction, 'emoticon') \
+                                else str(reaction.reaction)
+                            reaction_html += f'<span class="reaction">{reaction_str} {reaction.count}</span> '
+                    reaction_html += '</div>'
+                    message_html += reaction_html
+                except Exception as e:
+                    message_html += f'<div class="error">[Ошибка обработки реакций: {str(e)}]</div>'
+            
             message_html += '</div></div>'
             f.write(message_html)
+        
         print()
         
         f.write('</div></body></html>')
@@ -93,6 +202,8 @@ async def save_dialog(client, entity, output_dir="dialogs"):
         'name': get_entity_name(entity),
         'path': html_filename
     }
+
+
 
 async def check_spam_block(client):
     
@@ -151,6 +262,7 @@ async def process_media(client, message, media_dir):
             path, filename = await download_file(client, message, media_dir, 'photos')
             rel_path = os.path.join("media", 'photos', filename)
             html += f'<img src="{rel_path}" alt="{filename}">'
+        
         elif isinstance(media, MessageMediaDocument):
             doc = media.document
             attrs = {type(a): a for a in doc.attributes}
@@ -182,6 +294,7 @@ async def process_media(client, message, media_dir):
                 <div class="file-card">
                     📎 <a href="{rel_path}" download="{filename}">{filename}</a>
                 </div>'''
+
         elif isinstance(media, MessageMediaGeo):
             geo = media.geo
             html += f'''
@@ -190,11 +303,27 @@ async def process_media(client, message, media_dir):
                    {geo.lat:.4f}, {geo.long:.4f}
                 </a>
             </div>'''
+
+        elif isinstance(media, MessageMediaContact):
+            contact = media
+            first_name = contact.first_name or ""
+            last_name = contact.last_name or ""
+            phone_number = contact.phone_number or "Не указан"
+            user_id = f"@{contact.user_id}" if contact.user_id else "Нет username"
+
+            full_name = f"{first_name} {last_name}".strip()
+            contact_display = f'''
+            <div class="contact-card">
+                <strong>👤 Контакт:</strong> {full_name if full_name else "Неизвестный"}<br>
+                <strong>📞 Телефон:</strong> {phone_number}<br>
+                <strong>🔗 Telegram:</strong> {user_id}
+            </div>'''
+            html += contact_display
+
     except Exception as e:
         html += f'<div class="error">[Ошибка: {str(e)}]</div>'
     html += '</div>'
     return html
-    
 
 
 async def save_channel(client, entity, output_dir="dialogs/channels"):

@@ -1,4 +1,3 @@
-# css.py
 CSS_STYLES = """
 <style>
     :root {
@@ -118,6 +117,74 @@ CSS_STYLES = """
         font-size: 0.8em; 
         color: rgba(255, 255, 255, 0.7); 
         margin-bottom: 5px; 
+    }
+    .inline-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .inline-buttons-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .inline-button {
+        display: inline-block;
+        background-color: #273329;
+        color: #65fd96;
+        padding: 6px 12px;
+        border-radius: 5px;
+        text-decoration: none;
+        border: 1px solid #151e17;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+        position: relative;
+    }
+    .inline-button:hover {
+        background-color: #1f2923;
+        border-color: #151e17;
+    }
+    .inline-button[href^="http"]::after {
+        content: '↗';
+        font-size: 12px;
+        position: absolute;
+        top: 4px;
+        right: 6px;
+        color: #65fd96;
+        opacity: 0.8;
+    }
+    .reactions {
+        margin-top: 5px;
+    }
+    .reaction {
+        display: inline-block;
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        padding: 2px 6px;
+        border-radius: 12px;
+        margin-right: 4px;
+    }
+    strong {
+        font-weight: bold;
+    }
+    em {
+        font-style: italic;
+    }
+    code {
+        font-family: 'Courier New', monospace;
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+    pre {
+        font-family: 'Courier New', monospace;
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 10px;
+        border-radius: 3px;
+        overflow-x: auto;
+    }
+    .paren-bold {
+        font-weight: bold;
     }
     @media (max-width: 600px) { 
         .bubble { 
