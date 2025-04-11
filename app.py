@@ -6,12 +6,21 @@ from index import generate_index
 from info import get_full_account_info
 
 async def main_menu(client):
+    # Получаем информацию о текущем пользователе
+    me = await client.get_me()
+    user_name = f"{me.first_name or ''} {me.last_name or ''}".strip() or "Не указано"
+    username = f"@{me.username}" if me.username else "отсутствует"
+    user_id = f"{me.id}"
+
     while True:
-       
         print("\n********************************")
-        print("*DumpTGbyWorpli_V.11.1*")
+        print("*DumpTGbyWorpli_V.11.2*")
         print("********************************")
-        print("\nВыберите действие:\n")
+        print("\nПодключенный аккаунт:")
+        print(f"Имя: {user_name}")
+        print(f"Username: {username}")
+        print(f"ID: {user_id}\n")
+        print("Выберите действие:\n")
         print("1 - Дамп одного диалога")
         print("2 - Дамп всех личных диалогов")
         print("3 - Дамп канала")
@@ -64,7 +73,6 @@ async def main_menu(client):
 
         elif choice == '4':
             try:
-                me = await client.get_me()
                 saved_messages = await client.get_entity("me")
                 result = await save_dialog(client, saved_messages)
                 print(f"\nДиалог 'Избранное' сохранён: {result['path']}")
@@ -86,8 +94,8 @@ async def main():
         api_id,
         api_hash,
         device_model='DumpTGbyWorpli',
-        system_version='11.1',
-        app_version='11.1'
+        system_version='11.2',
+        app_version='11.2'
     ) as client:
         await client.start()
         await main_menu(client)
