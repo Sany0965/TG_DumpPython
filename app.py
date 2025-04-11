@@ -6,7 +6,7 @@ from index import generate_index
 from info import get_full_account_info
 
 async def main_menu(client):
-    # Получаем информацию о текущем пользователе
+    
     me = await client.get_me()
     user_name = f"{me.first_name or ''} {me.last_name or ''}".strip() or "Не указано"
     username = f"@{me.username}" if me.username else "отсутствует"
