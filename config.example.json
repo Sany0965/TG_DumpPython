@@ -1,0 +1,27 @@
+{
+  "api_id": 12345678,
+  "api_hash": "replace_with_your_api_hash",
+  "app_title": "Neuro",
+  "short_name": "Neurobot pizzaway",
+  "device_model": "Neuro TG Dump Web",
+  "system_version": "Windows / Android",
+  "app_version": "13.1",
+  "lang_code": "ru",
+  "system_lang_code": "ru-RU",
+  "ui": {
+    "theme": "monet",
+    "effects": false,
+    "compact": false,
+    "avatars": true,
+    "auto_refresh": true
+  },
+  "proxy": {
+    "enabled": false,
+    "type": "socks5",
+    "host": "",
+    "port": 0,
+    "username": "",
+    "password": "",
+    "secret": ""
+  }
+}

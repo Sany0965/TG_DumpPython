@@ -269,9 +269,8 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
     processed_grouped = set()
     async def update_progress(current):
         if progress_callback:
-            percent = current / total_posts * 100
-            elapsed = time.time() - start_time
-            progress_callback(f"[{'▊' * int(percent//5)}{' ' * (20 - int(percent//5))}] {percent:.1f}% | Сообщений: {current}/{total_posts} | Время: {elapsed:.1f}с")
+            percent = current / max(total_posts, 1) * 100
+            progress_callback(percent, current, total_posts, "Обработка постов и медиа")
     subscribers = channel_info.get('participants_count') or 0
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(f'''<!DOCTYPE html>
@@ -297,8 +296,8 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
         </header>
         <div class="messages">
 ''')
-        for post in reversed(posts):
-            await update_progress(1)
+        for current, post in enumerate(reversed(posts), 1):
+            await update_progress(current)
             grouped_id = getattr(post, 'grouped_id', None)
             if grouped_id:
                 if grouped_id in processed_grouped:
@@ -394,7 +393,7 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
 </html>
 ''')
     if progress_callback:
-        progress_callback("Готово! Архив сохранен")
+        progress_callback(100, total_posts, total_posts, "Готово")
     return output_path
 
 async def process_grouped_media(group, media_dir):

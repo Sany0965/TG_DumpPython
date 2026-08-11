@@ -99,12 +99,18 @@ async def get_stars_balance(client):
         print("Ошибка при получении баланса Stars:", e)
         return 0
 
-async def save_dialog(client, entity, output_dir="dialogs"):
+async def save_dialog(client, entity, output_dir="dialogs", progress_callback=None):
     dialog_id = entity.id
     dialog_dir = os.path.join(output_dir, str(dialog_id))
     media_dir = os.path.join(dialog_dir, "media")
     os.makedirs(media_dir, exist_ok=True)
     os.makedirs(dialog_dir, exist_ok=True)
+
+    def emit(percent, current=0, total=0, stage="Обработка диалога"):
+        if progress_callback:
+            progress_callback(float(percent), int(current), int(total), stage)
+
+    emit(1, 0, 0, "Подготовка диалога")
     
     if getattr(entity, 'photo', None):
         avatar_path = os.path.join(dialog_dir, "avatar.jpg")
@@ -121,13 +127,19 @@ async def save_dialog(client, entity, output_dir="dialogs"):
         f.write(css.CSS_STYLES)
         f.write('</head><body><div class="container">')
         
+        expected = int(getattr(await client.get_messages(entity, limit=0), 'total', 0) or 0)
         messages = []
         async for message in client.iter_messages(entity, reverse=True, limit=None):
             messages.append(message)
+            collected = len(messages)
+            emit(min(15, 2 + collected / max(expected, collected, 1) * 13), collected,
+                 max(expected, collected), "Получение сообщений")
         
         total_messages = len(messages)
         for i, message in enumerate(messages):
-            percentage = int((i + 1) * 100 / total_messages)
+            percentage = int((i + 1) * 100 / max(total_messages, 1))
+            emit(15 + percentage * 0.84, i + 1, total_messages,
+                 f"Диалог: {get_entity_name(entity)}")
             print(f"\rОбработка диалога с {get_entity_name(entity)}: {percentage}%", end="")
             
             sender = await message.get_sender()
@@ -196,6 +208,8 @@ async def save_dialog(client, entity, output_dir="dialogs"):
         print()
         
         f.write('</div></body></html>')
+
+    emit(100, total_messages, total_messages, "Готово")
     
     return {
         'id': dialog_id,
@@ -326,20 +340,26 @@ async def process_media(client, message, media_dir):
     return html
 
 
-async def save_channel(client, entity, output_dir="dialogs/channels"):
+async def save_channel(client, entity, output_dir="dialogs/channels", progress_callback=None):
     try:
         channel_dir = os.path.join(output_dir, str(entity.id))
         media_dir = os.path.join(channel_dir, "media")
         os.makedirs(channel_dir, exist_ok=True)
         os.makedirs(media_dir, exist_ok=True)
 
-        total_messages = (await client.get_messages(entity, limit=0)).total
+        def emit(percent, current=0, total=0, stage="Обработка канала"):
+            if progress_callback:
+                progress_callback(float(percent), int(current), int(total), stage)
+
+        total_messages = int((await client.get_messages(entity, limit=0)).total or 0)
+        emit(1, 0, total_messages, "Подготовка канала")
         processed = 0
         start_time = time.time()
 
         def update_progress():
             nonlocal processed
-            percent = (processed / total_messages) * 100
+            percent = (processed / max(total_messages, processed, 1)) * 100
+            emit(2 + percent * 0.18, processed, max(total_messages, processed), "Получение постов")
             elapsed = time.time() - start_time
             print(
                 f"\rОбработка: [{'#' * int(percent//2)}{' ' * (50 - int(percent//2))}] "
@@ -383,9 +403,11 @@ async def save_channel(client, entity, output_dir="dialogs/channels"):
             posts=posts,
             output_path=html_path,
             media_dir=media_dir,
-            progress_callback=lambda p: print(f"\rСохранение медиа: {p}%", end='')
+            progress_callback=lambda p, current=0, total=0, stage="Обработка постов": emit(
+                20 + float(p) * 0.8, current, total, stage)
         )
 
+        emit(100, len(posts), len(posts), "Готово")
         print(f"\nКанал сохранен: {html_path}")
         return {
             'id': entity.id,
@@ -430,8 +452,8 @@ async def download_file(client, message, base_dir, media_type):
         await message.download_media(file=path)
     return path, safe_filename
 
-async def fetch_user_info(client):
-    os.makedirs("dialogs", exist_ok=True)
+async def fetch_user_info(client, output_dir="dialogs"):
+    os.makedirs(output_dir, exist_ok=True)
     me = await client.get_me()
     try:
         result = await client(GetAuthorizationsRequest())
@@ -462,13 +484,13 @@ async def fetch_user_info(client):
         'devices': devices
     }
     if me.photo:
-        avatar_path = os.path.join("dialogs", "avatar.jpg")
+        avatar_path = os.path.join(output_dir, "avatar.jpg")
         user_info['avatar'] = await client.download_profile_photo(me, file=avatar_path)
     return user_info
 
 
 
-async def fetch_dialogs(client):
+async def fetch_dialogs(client, output_dir="dialogs"):
     dialogs = []
     all_dialogs = []
     async for dialog in client.iter_dialogs():
@@ -484,7 +506,7 @@ async def fetch_dialogs(client):
                 path = f"https://t.me/{username}"
             else:
                 path = "#"
-            channels_dir = os.path.join("dialogs", "channels")
+            channels_dir = os.path.join(output_dir, "channels")
             os.makedirs(channels_dir, exist_ok=True)
             avatar_path = None
             if getattr(dialog.entity, 'photo', None):
@@ -509,7 +531,7 @@ async def fetch_dialogs(client):
             type_label = 'Чат'
         else:
             type_label = 'Неизвестно'
-        path = os.path.join("dialogs", str(dialog.id), f"dialog_{dialog.id}.html")
+        path = os.path.join(output_dir, str(dialog.id), f"dialog_{dialog.id}.html")
         dialogs.append({
             'id': dialog.id,
             'name': dialog.name,
