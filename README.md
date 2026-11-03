@@ -62,9 +62,7 @@ python -m venv .venv
 python app.py
 ```
 
-## Безопасность
 
-Файлы `.session`, каталог `runtime`, дампы, `.venv` и `config.json` не следует публиковать. Для публичного GitHub используйте `config.example.json` без реальных API-ключей.
 
 ## Автор
 
