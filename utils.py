@@ -6,13 +6,13 @@ from telethon.tl.types import (
     MessageMediaPhoto, MessageMediaDocument,
     DocumentAttributeVideo, DocumentAttributeAudio,
     DocumentAttributeSticker, MessageMediaGeo,
-    User, Channel, MessageMediaWebPage,         
-    MessageReplyHeader, ReplyInlineMarkup       
+    User, Channel, MessageMediaWebPage,
+    MessageReplyHeader, ReplyInlineMarkup
 )
 from telethon.tl.functions.account import GetAuthorizationsRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.utils import get_extension        
-from channel import generate_channel_html       
+from telethon.utils import get_extension
+from channel import generate_channel_html
 import css
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon import functions, types
@@ -26,7 +26,7 @@ async def process_media(client, message, media_dir):
             path, filename = await download_file(client, message, media_dir, 'photos')
             rel_path = os.path.join("media", 'photos', filename)
             html += f'<img src="{rel_path}" alt="{filename}">'
-        
+
         elif isinstance(media, MessageMediaDocument):
             doc = media.document
             attrs = {type(a): a for a in doc.attributes}
@@ -58,7 +58,7 @@ async def process_media(client, message, media_dir):
                 <div class="file-card">
                     📎 <a href="{rel_path}" download="{filename}">{filename}</a>
                 </div>'''
-        
+
         elif isinstance(media, MessageMediaGeo):
             geo = media.geo
             html += f'''
@@ -67,7 +67,7 @@ async def process_media(client, message, media_dir):
                    {geo.lat:.4f}, {geo.long:.4f}
                 </a>
             </div>'''
-        
+
         elif isinstance(media, MessageMediaContact):
             contact = media
             first_name = contact.first_name or ""
@@ -93,7 +93,7 @@ async def get_stars_balance(client):
         result = await client(functions.payments.GetStarsStatusRequest(
             peer=types.InputPeerSelf()
         ))
-        
+
         return result.balance
     except Exception as e:
         print("Ошибка при получении баланса Stars:", e)
@@ -111,14 +111,14 @@ async def save_dialog(client, entity, output_dir="dialogs", progress_callback=No
             progress_callback(float(percent), int(current), int(total), stage)
 
     emit(1, 0, 0, "Подготовка диалога")
-    
+
     if getattr(entity, 'photo', None):
         avatar_path = os.path.join(dialog_dir, "avatar.jpg")
         await client.download_profile_photo(entity, file=avatar_path)
-    
+
     html_filename = os.path.join(dialog_dir, f"dialog_{dialog_id}.html")
     os.makedirs(os.path.dirname(html_filename), exist_ok=True)
-    
+
     with open(html_filename, 'w', encoding='utf-8') as f:
         f.write('<!DOCTYPE html><html><head>')
         f.write('<meta charset="UTF-8">')
@@ -126,7 +126,7 @@ async def save_dialog(client, entity, output_dir="dialogs", progress_callback=No
         f.write(f'<title>Диалог с {get_entity_name(entity)}</title>')
         f.write(css.CSS_STYLES)
         f.write('</head><body><div class="container">')
-        
+
         expected = int(getattr(await client.get_messages(entity, limit=0), 'total', 0) or 0)
         messages = []
         async for message in client.iter_messages(entity, reverse=True, limit=None):
@@ -134,24 +134,24 @@ async def save_dialog(client, entity, output_dir="dialogs", progress_callback=No
             collected = len(messages)
             emit(min(15, 2 + collected / max(expected, collected, 1) * 13), collected,
                  max(expected, collected), "Получение сообщений")
-        
+
         total_messages = len(messages)
         for i, message in enumerate(messages):
             percentage = int((i + 1) * 100 / max(total_messages, 1))
             emit(15 + percentage * 0.84, i + 1, total_messages,
                  f"Диалог: {get_entity_name(entity)}")
             print(f"\rОбработка диалога с {get_entity_name(entity)}: {percentage}%", end="")
-            
+
             sender = await message.get_sender()
             is_me = message.sender_id == (await client.get_me()).id
             message_class = "my" if is_me else "their"
             sender_name = "Я" if is_me else f"{get_entity_name(sender)}"
-            
+
             forward_info = ""
             if message.fwd_from:
                 origin = await get_forward_origin(client, message.fwd_from)
                 forward_info = f'<div class="forward">↩️ Переслано от {origin}</div>'
-            
+
             message_html = f'''
             <div class="message {message_class}">
                 <div class="bubble">
@@ -160,15 +160,15 @@ async def save_dialog(client, entity, output_dir="dialogs", progress_callback=No
                         <span class="sender">{sender_name}</span>
                         <span class="date">{message.date.strftime('%d.%m.%Y %H:%M')}</span>
                     </div>'''
-            
+
             if message.text:
                 text = re.sub(r'\n', '<br>', message.text)
                 message_html += f'<div class="text">{text}</div>'
-            
+
             if message.media:
                 media_html = await process_media(client, message, media_dir)
                 message_html += media_html
-            
+
             if hasattr(message, "reply_markup") and message.reply_markup:
                 try:
                     inline_buttons_html = '<div class="inline-buttons">'
@@ -187,30 +187,30 @@ async def save_dialog(client, entity, output_dir="dialogs", progress_callback=No
                     message_html += inline_buttons_html
                 except Exception as e:
                     message_html += f'<div class="error">[Ошибка обработки инлайн-кнопок: {str(e)}]</div>'
-            
+
             if hasattr(message, "reactions") and message.reactions:
                 try:
                     reaction_html = '<div class="reactions">'
                     if hasattr(message.reactions, "results") and message.reactions.results:
                         for reaction in message.reactions.results:
-                            reaction_str = getattr(reaction.reaction, 'emoticon', None) \
-                                if hasattr(reaction.reaction, 'emoticon') \
+                            reaction_str = getattr(reaction.reaction, 'emoticon', None)\
+                                if hasattr(reaction.reaction, 'emoticon')\
                                 else str(reaction.reaction)
                             reaction_html += f'<span class="reaction">{reaction_str} {reaction.count}</span> '
                     reaction_html += '</div>'
                     message_html += reaction_html
                 except Exception as e:
                     message_html += f'<div class="error">[Ошибка обработки реакций: {str(e)}]</div>'
-            
+
             message_html += '</div></div>'
             f.write(message_html)
-        
+
         print()
-        
+
         f.write('</div></body></html>')
 
     emit(100, total_messages, total_messages, "Готово")
-    
+
     return {
         'id': dialog_id,
         'name': get_entity_name(entity),
@@ -220,15 +220,15 @@ async def save_dialog(client, entity, output_dir="dialogs", progress_callback=No
 
 
 async def check_spam_block(client):
-    
+
     try:
         spam_bot = await client.get_entity('SpamBot')
         await client.send_message(spam_bot, '/start')
-        
-        
+
+
         start_time = time.time()
         response_text = ""
-        
+
         while time.time() - start_time < 10:
             async for message in client.iter_messages(spam_bot, limit=1):
                 if not message.out:
@@ -237,8 +237,8 @@ async def check_spam_block(client):
             if response_text:
                 break
             await asyncio.sleep(1)
-        
-        
+
+
         safe_phrases = [
             "Ваш аккаунт свободен от каких-либо ограничений",
             "Good news, no limits are currently applied to your account"
@@ -246,7 +246,7 @@ async def check_spam_block(client):
         if any(phrase in response_text for phrase in safe_phrases):
             return "Нет"
         return "Да"
-        
+
     except Exception as e:
         print(f"Ошибка проверки спам-блока: {str(e)}")
         return "Неизвестно"
@@ -276,7 +276,7 @@ async def process_media(client, message, media_dir):
             path, filename = await download_file(client, message, media_dir, 'photos')
             rel_path = os.path.join("media", 'photos', filename)
             html += f'<img src="{rel_path}" alt="{filename}">'
-        
+
         elif isinstance(media, MessageMediaDocument):
             doc = media.document
             attrs = {type(a): a for a in doc.attributes}
@@ -431,9 +431,10 @@ async def download_file(client, message, base_dir, media_type):
             doc = message.media.document
             doc_name = getattr(doc, 'name', None)
             if doc_name:
-                filename = doc_name.rsplit('.', 1)[0]
+                doc_name = os.path.basename(str(doc_name).replace("\\", "/"))
+                filename = os.path.splitext(doc_name)[0]
                 if '.' in doc_name:
-                    file_ext = doc_name.split('.')[-1].lower()
+                    file_ext = os.path.splitext(doc_name)[1].lstrip('.').lower()
             if doc.mime_type:
                 ext_from_mime = mimetypes.guess_extension(doc.mime_type)
                 if ext_from_mime:

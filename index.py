@@ -2,7 +2,7 @@ import os
 import re
 import asyncio
 import time
-from info import fetch_bot_data, get_entity_name  
+from info import fetch_bot_data, get_entity_name
 from utils import check_spam_block, get_stars_balance
 
 async def generate_wallets_html(client):
@@ -82,7 +82,7 @@ async def generate_contacts_html(client):
             contacts.append(entity)
     if not contacts:
         return "<p>Контакты не найдены</p>"
-    
+
     html = '<h2>Контакты</h2>'
     html += '<table style="width:100%; border-collapse: collapse; margin-bottom:20px;">'
     html += '<tr style="background: #2a2a2a;">'
@@ -110,7 +110,7 @@ async def generate_index(client, user, dialogs, output_dir="dialogs"):
         'Неизвестно': 3
     }
     dialogs_sorted = sorted(dialogs, key=lambda d: order.get(d.get("type", "Неизвестно"), 99))
-    
+
     spam_status = await check_spam_block(client)
     stars_balance = await get_stars_balance(client)
     try:

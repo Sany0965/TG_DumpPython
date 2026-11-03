@@ -46,7 +46,7 @@ async def get_full_account_info(client, output_dir="dialogs"):
         'Группы': 0,
         'Пользователи': 0,
         'Боты': 0,
-        'Избранное': 1,
+        'Избранное': 0,
         'Неизвестно': 0
     }
 
@@ -167,7 +167,7 @@ async def fetch_user_info(client):
             'ip': auth.ip
         })
     full = await client(GetFullUserRequest(me))
-    bio = getattr(full, 'about', None) or ''
+    bio = getattr(getattr(full, 'full_user', full), 'about', None) or ''
     user_info = {
         'id': me.id,
         'username': me.username or '',

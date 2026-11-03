@@ -240,7 +240,7 @@ CSS_STYLES = """
 """
 
 def format_post_text(text):
-    pattern_link = re.compile(r'([^]+)(https?://[^\s)]+)')
+    pattern_link = re.compile(r'\[([^\]]+)\]\((https?://[^\s)]+)\)')
     text = pattern_link.sub(r'<a href="\2">\1</a>', text)
     text = re.sub(r'\*\*([^\*]+)\*\*', r'<strong>\1</strong>', text)
     text = re.sub(r'(\B#[\w\d_]+)', r'<span class="hashtag">\1</span>', text)
@@ -272,6 +272,11 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
             percent = current / max(total_posts, 1) * 100
             progress_callback(percent, current, total_posts, "Обработка постов и медиа")
     subscribers = channel_info.get('participants_count') or 0
+    avatar = channel_info.get('avatar')
+    avatar_html = (
+        f'<img class="avatar" src="{os.path.relpath(avatar, os.path.dirname(output_path))}" alt="Аватар">'
+        if avatar and os.path.exists(avatar) else ''
+    )
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(f'''<!DOCTYPE html>
 <html>
@@ -286,7 +291,7 @@ async def generate_channel_html(channel_info, posts, output_path, media_dir, pro
 <body>
     <div class="container">
         <header class="header">
-            <img class="avatar" src="{os.path.relpath(channel_info['avatar'], os.path.dirname(output_path))}" alt="Аватар">
+            {avatar_html}
             <h1 class="channel-title">{channel_info['title']}</h1>
             <p class="channel-meta">@{channel_info.get('username', 'unknown')}</p>
             <p class="channel-meta">{subscribers} подписчиков</p>
@@ -475,11 +480,12 @@ async def download_media(post, base_dir, media_type):
         doc = post.media.document
         for attr in doc.attributes:
             if isinstance(attr, DocumentAttributeFilename):
-                ext = os.path.splitext(attr.file_name)[1]  
-                filename = os.path.splitext(attr.file_name)[0]  
+                original_name = os.path.basename(attr.file_name.replace("\\", "/"))
+                ext = os.path.splitext(original_name)[1]
+                filename = os.path.splitext(original_name)[0]
                 break
 
-    filename = f"{filename}{ext}" 
+    filename = f"{filename}{ext}"
     target_dir = os.path.join(base_dir, media_type)
     os.makedirs(target_dir, exist_ok=True)
     path = os.path.join(target_dir, filename)

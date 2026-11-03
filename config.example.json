@@ -1,11 +1,11 @@
 {
-  "api_id": 12345678,
-  "api_hash": "replace_with_your_api_hash",
-  "app_title": "Neuro",
+  "api_id": 0,
+  "api_hash": "YOUR_API_HASH",
+  "app_title": "Telegram Export Suite",
   "short_name": "Neurobot pizzaway",
   "device_model": "Neuro TG Dump Web",
   "system_version": "Windows / Android",
-  "app_version": "13.1",
+  "app_version": "14.0",
   "lang_code": "ru",
   "system_lang_code": "ru-RU",
   "ui": {

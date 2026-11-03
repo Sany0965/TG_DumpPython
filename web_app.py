@@ -10,6 +10,7 @@ import traceback
 import uuid
 import webbrowser
 import zipfile
+import threading
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
@@ -51,8 +52,8 @@ AVATARS = RUNTIME / "avatars"
 AVATARS.mkdir(exist_ok=True)
 CONFIG_PATH = ROOT / "config.json"
 
-# Незавершённые экспорты никогда не считаются архивами. Если приложение
-# аварийно закрыли, остатки будут убраны при следующем запуске.
+
+
 for stale_partial in EXPORTS.glob(".partial-*"):
     shutil.rmtree(stale_partial, ignore_errors=True)
 
@@ -281,7 +282,7 @@ async def ensure_client(api_id=None, api_hash=None):
         api_hash,
         device_model=config.get("device_model", "Neuro TG Dump Web"),
         system_version=config.get("system_version", "Windows / Android"),
-        app_version=config.get("app_version", "13.0"),
+        app_version=config.get("app_version", "14.0"),
         lang_code=config.get("lang_code", "ru"),
         system_lang_code=config.get("system_lang_code", "ru-RU"),
         connection=network["connection"],
@@ -335,6 +336,10 @@ async def page(_request):
     return web.FileResponse(ROOT / "web" / "index.html")
 
 
+async def api_health(_request):
+    return web.json_response({"ok": True, "app": "Telegram Export Suite", "version": "14.0"})
+
+
 async def api_status(_request):
     await restore_session_once()
     config = read_config()
@@ -358,7 +363,7 @@ async def api_status(_request):
             "app": {
                 "title": config.get("app_title", "Neuro"),
                 "device": config.get("device_model", "Neuro TG Dump Web"),
-                "version": config.get("app_version", "13.0"),
+                "version": config.get("app_version", "14.0"),
             },
         }
     )
@@ -366,11 +371,11 @@ async def api_status(_request):
 
 async def api_send_code(request):
     data = await json_body(request)
+    S.phone = str(data.get("phone", "")).strip()
+    if not S.phone:
+        raise ValueError("Введи номер с кодом страны, например +79991234567")
     try:
         client = await ensure_client()
-        S.phone = str(data.get("phone", "")).strip()
-        if not S.phone:
-            raise ValueError("Введи номер с кодом страны, например +79991234567")
         S.log(f"Запрос кода для {S.phone[:4]}***{S.phone[-2:]}")
         sent = await client.send_code_request(S.phone, force_sms=False)
         S.phone_code_hash = sent.phone_code_hash
@@ -411,6 +416,8 @@ async def api_sign_in(request):
 
 async def api_password(request):
     data = await json_body(request)
+    if not S.client or not S.phone:
+        raise ValueError("Сначала запроси код по номеру телефона")
     try:
         await S.client.sign_in(password=data.get("password", ""))
     except PasswordHashInvalidError:
@@ -431,12 +438,15 @@ async def api_reset_auth(_request):
 
 async def api_logout(_request):
     if S.client:
-        await S.client.log_out()
+        await S.client.disconnect()
         S.client = None
     S.account = None
+    S.phone = ""
+    S.phone_code_hash = None
+    S.code_sent = False
     S.auth_checked = True
     S.stage = "Выход выполнен"
-    S.log("Выполнен выход из аккаунта")
+    S.log("Выполнен выход из аккаунта без отзыва Telegram-сессии")
     return web.json_response({"ok": True})
 
 
@@ -763,6 +773,8 @@ async def api_export(request):
 
 
 async def api_cancel(_request):
+    if not await authorized():
+        raise web.HTTPUnauthorized()
     if S.task and not S.task.done():
         S.cancellable = False
         S.stage = "Отмена…"
@@ -775,6 +787,8 @@ async def api_cancel(_request):
 
 
 async def api_files(_request):
+    if not await authorized():
+        raise web.HTTPUnauthorized()
     files = []
     for path in EXPORTS.rglob("*"):
         relative_path = path.relative_to(EXPORTS)
@@ -794,10 +808,14 @@ async def api_files(_request):
 
 
 async def api_get_settings(_request):
+
+
     return web.json_response(public_settings())
 
 
 async def api_save_settings(request):
+
+
     data = await json_body(request)
     old_config = read_config()
     new_config = dict(old_config)
@@ -872,6 +890,19 @@ async def api_save_settings(request):
 
 
 @web.middleware
+async def cors_middleware(request, handler):
+    if request.method == "OPTIONS" and request.path.startswith("/api/"):
+        response = web.Response(status=204)
+    else:
+        response = await handler(request)
+    if request.path.startswith("/api/"):
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
+
+
+@web.middleware
 async def error_middleware(request, handler):
     try:
         return await handler(request)
@@ -898,10 +929,10 @@ def local_ip():
 
 
 def make_app():
-    app = web.Application(middlewares=[error_middleware], client_max_size=12 * 1024**2)
+    app = web.Application(middlewares=[cors_middleware, error_middleware], client_max_size=12 * 1024**2)
     app.router.add_get("/", page)
     app.router.add_static("/static", ROOT / "web" / "static")
-    app.router.add_static("/exports", EXPORTS, show_index=True)
+    app.router.add_get("/api/health", api_health)
     app.router.add_get("/api/status", api_status)
     app.router.add_post("/api/auth/send-code", api_send_code)
     app.router.add_post("/api/auth/sign-in", api_sign_in)
@@ -955,10 +986,16 @@ def main():
         print(f" В локальной сети: http://{local_ip()}:{args.port}")
     print("=" * 52 + "\n")
     if not args.no_browser:
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+
+
+
+        def open_browser_later():
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+
+        threading.Timer(1.2, open_browser_later).start()
     web.run_app(make_app(), host=args.host, port=args.port, print=None)
 
 
