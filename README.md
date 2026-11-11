@@ -3,6 +3,14 @@
 ## 📸 Screenshots
 ![Photo](https://raw.githubusercontent.com/Sany0965/TG_DumpPython/refs/heads/main/docs/file_00000000bcd4821098d293612f1fe813.png)
 
+
+![Photo](https://raw.githubusercontent.com/Sany0965/TG_DumpPython/refs/heads/main/docs/Screenshot_20261111-162844.jpg)
+
+
+![Photo](https://raw.githubusercontent.com/Sany0965/TG_DumpPython/refs/heads/main/docs/Screenshot_20261111-162755.jpg)
+
+
+![Photo](https://raw.githubusercontent.com/Sany0965/TG_DumpPython/refs/heads/main/docs/Screenshot_20261111-162748.jpg)
 Локальная панель для экспорта Telegram-диалогов, каналов, сообщений и медиа в HTML-архивы.
 
 Проект работает локально и не использует облачное хранилище для дампов. Сессии, конфигурация и экспортированные файлы остаются на устройстве пользователя.
