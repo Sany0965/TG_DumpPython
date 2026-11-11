@@ -3,6 +3,9 @@
 
 **Доступно .apk  приложение для андроид** 
 
+[Download \| Скачать](https://github.com/Sany0965/TG_DumpPython/releases/download/Релизуро/release.beta.0.1.apk)
+
+
 Локальная веб-панель для экспорта Telegram-диалогов, каналов, «Избранного» и медиа в HTML.
 
 ## Изменения 14.0
