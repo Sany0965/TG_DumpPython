@@ -1,4 +1,7 @@
+
 # TG Dump Web 14.0
+## 📸 Screenshots
+![Photo](https://raw.githubusercontent.com/Sany0965/TG_DumpPython/refs/heads/main/docs/file_00000000bcd4821098d293612f1fe813.png)
 
 Локальная панель для экспорта Telegram-диалогов, каналов, сообщений и медиа в HTML-архивы.
 
