@@ -19,7 +19,7 @@
 
 Для проекта доступна Android-версия TG Dump:
 
-[Скачать APK](https://github.com/Sany0965/TG_DumpPython/releases/download/%D0%A0%D0%B5%D0%BB%D0%B8%D0%B7%D1%83%D1%80%D0%BE/release.beta.0.1.apk)
+[Скачать APK в release](https://github.com/Sany0965/TG_DumpPython/releases)
 
 Android-версия запускает TG Dump внутри приложения и предоставляет мобильный интерфейс для работы с Telegram.
 
@@ -367,7 +367,7 @@ Download/TG DUMP/<telegram_id>.session
 
 Тестовая сборка:
 
-[Скачать release.beta.0.1.apk](https://github.com/Sany0965/TG_DumpPython/releases/download/%D0%A0%D0%B5%D0%BB%D0%B8%D0%B7%D1%83%D1%80%D0%BE/release.beta.0.1.apk)
+[Скачать release.beta.0.1.apk in release](https://github.com/Sany0965/TG_DumpPython/releases)
 
 Требования:
 
@@ -387,4 +387,3 @@ Download/TG DUMP/<telegram_id>.session
 ## Лицензия
 
 Проект распространяется согласно условиям лицензии, указанной в файле [LICENSE](LICENSE).
-```
